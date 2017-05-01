@@ -38,7 +38,7 @@ def get_taxonid_to_dumpsfilenames(name_ftpdirpaths_filename):
 		splits = line.strip().split(' ') #split on each of the spaces
 		name = ' '.join(splits[:-1]) #concatenate everything before the last space
 		ftpdirpath = splits[-1] #everything after the last space
-		dumpsfilename = './Bacteria_Genomes/' + ftpdirpath.split('/')[-1] + '_genomic.fna.dumps'
+		dumpsfilename = './Bacteria_Genomes/' + ftpdirpath.split('/')[-1] + '_genomic.fna.gz.dumps'
 		name_to_listtaxonid = ncbi.get_name_translator([name]) #a dictionary with name as key and [taxonid] as value
 		listtaxonid = [taxonid for [taxonid] in name_to_listtaxonid.values()]
 		if listtaxonid == []:
@@ -69,14 +69,14 @@ def get_tree(name_ftpdirpaths_filename,num_taxons = 0):
 	ncbi = NCBITaxa()
 	taxonid_to_dumpsfilenames = get_taxonid_to_dumpsfilenames(name_ftpdirpaths_filename)
 	
-	#get the list of unique taxonids, in order to create the phylogeny tree
+	#get the desired number of unique taxonids, in order to create the phylogeny tree
 	taxonids = taxonid_to_dumpsfilenames.keys() #length is 6,740 as expected (6,741 minus the one not in NCBI)
-	unique_taxonids = list(set(taxonids)) #4,526 taxonids are unique
-	taxonids_test = unique_taxonids[:10] #smaller set of taxonids for tree construction and testing
+	taxonids = list(set(taxonids)) #4,526 taxonids are unique
+	if num_taxons != 0:
+		taxonids = taxonids[:num_taxons] #smaller set of taxonids for tree construction and testing
 	
-	#create full phylogeny tree and test phylogeny tree
-	tree = ncbi.get_topology(unique_taxonids) #5,360 total nodes
-	tree_test = ncbi.get_topology(taxonids_test)
+	#return desired phylogeny tree
+	return ncbi.get_topology(taxonids) #5,360 total nodes
 
 if __name__=="__main__":
 	
