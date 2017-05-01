@@ -65,51 +65,18 @@ def bf_from_bvfilename(bvfilename):
 	bf = BloomFilter(len(bitvector), 3, bitvector) #We use num_hashes = 3
 	return bf
 
-def add_bloomfilters(tree):
-		
-	edited_names = []
-	i=0
-	numnodes = len(list(tree.traverse()))
-	for node in tree.traverse('postorder'): #traverse each node in the tree from leaf level upward to root level
-		i+=1
-		taxonid = int(node.name)
-		name = ncbi.translate_to_names([taxonid])[0]
-		print('Node ' + str(i) + ' out of ' + str(numnodes) + ': ' + name)
-		sys.stdout.flush()
-		if "/" in name:
-			edited_names.append(name)
-		edited_name = name.replace(' ', '_').replace('/', '_') #replace spaces and / with underscores so that it can be a filename, e.g. Acinetobacter calcoaceticus/baumannii complex
-		bv_filename = edited_name + '.bv'
-		if False: #os.path.exists(bv_filename):
-			print(bv_filename + ' already exists. Loading...')
-			sys.stdout.flush()
-			node.bf = bf_from_bvfilename(bv_filename)
-		else:
-			node.kmers = []
-			if taxonid in taxonid_to_dumpsfilenames:
-				dumpsfilenames = taxonid_to_dumpsfilenames[taxonid]
-				numfiles = len(dumpsfilenames)
-				j = 0
-				for dumpsfilename in dumpsfilenames:
-					j+= 1
-					print('Node ' + str(i) + ' out of ' + str(numnodes) + ': ' + name + '; File ' + str(j) + ' out of ' + str(numfiles))
-					sys.stdout.flush()
-					for line in open(dumpsfilename):
-						kmer = line.strip().split(' ')[0]
-						node.kmers.append(kmer)
-			if not node.is_leaf():
-				children = node.children
-				for child in children:
-					node.kmers.extend(child.kmers)
-					delattr(child, 'kmers')
-			size = int(round(len(node.kmers) * 4.25,-3))
-			node.bf = BloomFilter(size, num_hashes = 3)
-			for kmer in node.kmers:
-				node.bf.add(kmer)
-			f = open(bv_filename, 'wb')
-			node.bf.bv.write_to_file(f)
-			f.close()
-			delattr(node, 'bf')
+def get_tree(name_ftpdirpaths_filename,num_taxons = 0):
+	ncbi = NCBITaxa()
+	taxonid_to_dumpsfilenames = get_taxonid_to_dumpsfilenames(name_ftpdirpaths_filename)
+	
+	#get the list of unique taxonids, in order to create the phylogeny tree
+	taxonids = taxonid_to_dumpsfilenames.keys() #length is 6,740 as expected (6,741 minus the one not in NCBI)
+	unique_taxonids = list(set(taxonids)) #4,526 taxonids are unique
+	taxonids_test = unique_taxonids[:10] #smaller set of taxonids for tree construction and testing
+	
+	#create full phylogeny tree and test phylogeny tree
+	tree = ncbi.get_topology(unique_taxonids) #5,360 total nodes
+	tree_test = ncbi.get_topology(taxonids_test)
 
 #query the tree
 def query_tree(querytaxonid, tree):
@@ -175,20 +142,11 @@ def query_tree(querytaxonid, tree):
 	return sorted(responses.items(), key = operator.itemgetter(1), reverse = True)
 
 if __name__=="__main__":
-
-	ncbi = NCBITaxa()
-	taxonid_to_dumpsfilenames = get_taxonid_to_dumpsfilenames('name_ftpdirpaths')
 	
-	#get the list of unique taxonids, in order to create the phylogeny tree
-	taxonids = taxonid_to_dumpsfilenames.keys() #length is 6,740 as expected (6,741 minus the one not in NCBI)
-	unique_taxonids = list(set(taxonids)) #4,526 taxonids are unique
-	taxonids_test = unique_taxonids[:10] #smaller set of taxonids for tree construction and testing
-
-	#create full phylogeny tree and test phylogeny tree
-	tree = ncbi.get_topology(unique_taxonids) #5,360 total nodes
-	tree_test = ncbi.get_topology(taxonids_test)
-
+	tree = get_tree('name_ftpdirpaths')
+	tree_test = get_tree('name_ftpdirpaths', 10)
+	
 	#construct the bloomfilters (only necessary for the first time building the database)
 	#actually, the end user never needs to perform this step, since they will download the bloom filters from the beginning
-	#add_bloomfilters(tree)
-	#add_bloomfilters(tree_test)
+	#construct_bloomfilters(tree)
+	#construct_bloomfilters(tree_test)
