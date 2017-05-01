@@ -76,14 +76,4 @@ def get_tree(name_ftpdirpaths_filename,num_taxons = 0):
 		taxonids = taxonids[:num_taxons] #smaller set of taxonids for tree construction and testing
 	
 	#return desired phylogeny tree
-	return ncbi.get_topology(taxonids) #5,360 total nodes
-
-if __name__=="__main__":
-	
-	tree = get_tree('name_ftpdirpaths')
-	tree_test = get_tree('name_ftpdirpaths', 10)
-	
-	#construct the bloomfilters (only necessary for the first time building the database)
-	#actually, the end user never needs to perform this step, since they will download the bloom filters from the beginning
-	#construct_bloomfilters(tree)
-	#construct_bloomfilters(tree_test)
+	return ncbi.get_topology(taxonids) #5,360 total nodes for full dataset
