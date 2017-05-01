@@ -125,7 +125,7 @@ def construct_bloomfilters(tree):
 			delattr(node, 'bf')
 
 #query the tree
-def query_tree(querytaxonid, tree):
+def query_tree(tree, querytaxonid):
 	
 	def get_query_kmers(querytaxonid):
 		queryname = ncbi.translate_to_names([querytaxonid])[0]
@@ -191,10 +191,17 @@ if __name__=="__main__":
 	
 	ncbi = NCBITaxa()
 	
-	tree = get_tree('name_ftpdirpaths')
-	tree_test = get_tree('name_ftpdirpaths', 10)
+	num_taxons = sys.argv[1]
 	
-	#construct the bloomfilters (only necessary for the first time building the database)
-	#actually, the end user never needs to perform this step, since they will download the bloom filters from the beginning
-	#construct_bloomfilters(tree)
-	#construct_bloomfilters(tree_test)
+	tree = get_tree('name_ftpdirpaths', num_taxons)
+	
+	command = sys.argv[2]
+	
+	if command == "bloomfilter":
+		#construct the bloomfilters (only necessary for the first time building the database)
+		#actually, the end user never needs to perform this step, since they will download the bloom filters from the beginning
+		construct_bloomfilters(tree)
+	
+	if command == "query":
+		querytaxonid = sys.argv[3]
+		print(query_tree(tree, querytaxonid))
