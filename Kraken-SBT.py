@@ -2,7 +2,6 @@ from BitVector import BitVector
 from collections import defaultdict
 from ete3 import NCBITaxa
 import mmh3
-import numpy as np
 import operator
 import os
 import sys
