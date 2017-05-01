@@ -59,4 +59,4 @@ def query_tree(querytaxonid, tree):
 				sys.stdout.flush()
 			else:
 				node_kmers_to_query.extend(node_kmers)
-return sorted(responses.items(), key = operator.itemgetter(1), reverse = True)
+	return sorted(responses.items(), key = operator.itemgetter(1), reverse = True)
