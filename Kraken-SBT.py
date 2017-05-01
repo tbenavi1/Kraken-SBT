@@ -188,6 +188,7 @@ if __name__=="__main__":
 	tree = ncbi.get_topology(unique_taxonids) #5,360 total nodes
 	tree_test = ncbi.get_topology(taxonids_test)
 
-	#construct (or load if already exist) the bloomfilters
-	add_bloomfilters(tree)
+	#construct the bloomfilters (only necessary for the first time building the database)
+	#actually, the end user never needs to perform this step, since they will download the bloom filters from the beginning
+	#add_bloomfilters(tree)
 	#add_bloomfilters(tree_test)
