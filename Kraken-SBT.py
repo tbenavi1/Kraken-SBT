@@ -76,7 +76,7 @@ def get_tree(name_ftpdirpaths_filename,num_taxons = 0):
 		taxonids = taxonids[:num_taxons] #smaller set of taxonids for tree construction and testing
 	
 	#return desired phylogeny tree
-  return ncbi.get_topology(taxonids) #5,360 total nodes for full dataset
+	return ncbi.get_topology(taxonids) #5,360 total nodes for full dataset
 
 def construct_bloomfilters(tree):
 		
@@ -122,7 +122,7 @@ def construct_bloomfilters(tree):
 			f = open(bv_filename, 'wb')
 			node.bf.bv.write_to_file(f)
 			f.close()
-      delattr(node, 'bf')
+			delattr(node, 'bf')
 
 #query the tree
 def query_tree(querytaxonid, tree):
@@ -185,16 +185,16 @@ def query_tree(querytaxonid, tree):
 				sys.stdout.flush()
 			else:
 				node_kmers_to_query.extend(node_kmers)
-        return sorted(responses.items(), key = operator.itemgetter(1), reverse = True)
+	return sorted(responses.items(), key = operator.itemgetter(1), reverse = True)
 
 if __name__=="__main__":
-  
-  ncbi = NCBITaxa()
-  
-  tree = get_tree('name_ftpdirpaths')
-  tree_test = get_tree('name_ftpdirpaths', 10)
-  
-  #construct the bloomfilters (only necessary for the first time building the database)
-  #actually, the end user never needs to perform this step, since they will download the bloom filters from the beginning
-  #construct_bloomfilters(tree)
-  #construct_bloomfilters(tree_test)
+	
+	ncbi = NCBITaxa()
+	
+	tree = get_tree('name_ftpdirpaths')
+	tree_test = get_tree('name_ftpdirpaths', 10)
+	
+	#construct the bloomfilters (only necessary for the first time building the database)
+	#actually, the end user never needs to perform this step, since they will download the bloom filters from the beginning
+	#construct_bloomfilters(tree)
+	#construct_bloomfilters(tree_test)
