@@ -43,9 +43,3 @@ def construct_bloomfilters(tree):
 			node.bf.bv.write_to_file(f)
 			f.close()
 			delattr(node, 'bf')
-
-if __name__=="__main__":
-  from make_tree import *
-  tree = get_tree('name_ftpdirpaths')
-  tree_test = get_tree('name_ftpdirpaths',10)
-  construct_bloomfilters
