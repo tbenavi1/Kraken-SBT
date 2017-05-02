@@ -65,11 +65,11 @@ def bf_from_bvfilename(bvfilename):
 	#bitvector = BitVector(filename = bvfilename) #loads file but doesn't actually read the data
 	f = open(bvfilename, 'rb')
 	bitvector = bitarray()
-	bitvector = bitvector.fromfile(f)
+	bitvector.fromfile(f)
 	f.close()
 	#numbits = os.stat(bvfilename).st_size * 8
 	#bitvector = bitvector.read_bits_from_file(numbits) #reads the data into the variable bitvector
-	bf = BloomFilter(len(bitvector), 3, bitvector) #We use num_hashes = 3
+	bf = BloomFilter(bitvector.length(), 3, bitvector) #We use num_hashes = 3
 	return bf
 
 def get_tree(name_ftpdirpaths_filename,num_taxons = 0):
