@@ -1,4 +1,3 @@
-#from BitVector import BitVector
 from bitarray import bitarray
 from collections import defaultdict
 from ete3 import NCBITaxa
@@ -13,7 +12,6 @@ class BloomFilter:
 		self.size = size
 		self.num_hashes = num_hashes
 		if bitvector is None:
-			#self.bv = BitVector(intVal = 0, size = size)
 			self.bv = bitarray(size)
 			self.bv.setall(False)
 		else:
@@ -62,13 +60,10 @@ def get_taxonid_to_dumpsfilenames(name_ftpdirpaths_filename):
 	return taxonid_to_dumpsfilenames
 
 def bf_from_bvfilename(bvfilename):
-	#bitvector = BitVector(filename = bvfilename) #loads file but doesn't actually read the data
 	f = open(bvfilename, 'rb')
 	bitvector = bitarray()
 	bitvector.fromfile(f)
 	f.close()
-	#numbits = os.stat(bvfilename).st_size * 8
-	#bitvector = bitvector.read_bits_from_file(numbits) #reads the data into the variable bitvector
 	bf = BloomFilter(bitvector.length(), 3, bitvector) #We use num_hashes = 3
 	return bf
 
@@ -126,7 +121,6 @@ def construct_bloomfilters(tree):
 			for kmer in node.kmers:
 				node.bf.add(kmer)
 			f = open(bv_filename, 'wb')
-			#node.bf.bv.write_to_file(f)
 			node.bf.bv.tofile(f)
 			f.close()
 			delattr(node, 'bf')
