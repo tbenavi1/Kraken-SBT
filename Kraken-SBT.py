@@ -158,7 +158,7 @@ def query_tree(tree, querytaxonid):
 			delattr(child, 'bf')
 			if len(kmer_matches) > threshold:
 				node_kmers.append((child, kmer_matches))
-		return node_kmers
+		return num_queried, node_kmers
 	
 	responses = {}
 	queryname, querykmers = get_query_kmers(querytaxonid)
@@ -179,7 +179,7 @@ def query_tree(tree, querytaxonid):
 			sys.stdout.flush()
 		else:
 			children = current_node.children
-			node_kmers = get_next_node_kmers(children, current_kmers, threshold, num_queried)
+			num_queried, node_kmers = get_next_node_kmers(children, current_kmers, threshold, num_queried)
 			if node_kmers == []:
 				responses[current_name] = len(current_kmers)/num_kmers
 				print('Proportion of query kmers matching ' + current_name + ': ' + str(len(current_kmers)/num_kmers))
