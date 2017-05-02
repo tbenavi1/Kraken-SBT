@@ -124,19 +124,28 @@ def construct_bloomfilters(tree):
 			delattr(node, 'bf')
 
 #query the tree
-def query_tree(tree, querytaxonid):
+def query_tree(tree, query):
 	
-	def get_query_kmers(querytaxonid):
-		queryname = ncbi.translate_to_names([querytaxonid])[0]
-		print('Query name is ' + queryname)
-		sys.stdout.flush()
-		querydumpsfilenames = taxonid_to_dumpsfilenames[querytaxonid]
+	def get_query_kmers(query):
 		querykmers = []
-		for querydumpsfilename in querydumpsfilenames:
-			for line in open(querydumpsfilename):
+		try:
+			querytaxonid = int(query)
+			queryname = ncbi.translate_to_names([querytaxonid])[0]
+			print('Query name is ' + queryname)
+			sys.stdout.flush()
+			querydumpsfilenames = taxonid_to_dumpsfilenames[querytaxonid]
+			for querydumpsfilename in querydumpsfilenames:
+				for line in open(querydumpsfilename):
+					kmer = line.strip().split(' ')[0]
+					querykmers.append(kmer)
+		except:
+			queryfilename = query
+			print('Query filename is ' + queryfilename)
+			sys.stdout.flush()
+			for line in open(queryfilename):
 				kmer = line.strip().split(' ')[0]
 				querykmers.append(kmer)
-		return queryname, querykmers
+		return querykmers
 	
 	def get_next_node_kmers(children, current_kmers, threshold, num_queried):
 		node_kmers = []
@@ -161,7 +170,7 @@ def query_tree(tree, querytaxonid):
 		return num_queried, node_kmers
 	
 	responses = {}
-	queryname, querykmers = get_query_kmers(querytaxonid)
+	querykmers = get_query_kmers(querytaxonid)
 	num_kmers = len(querykmers)
 	threshold = num_kmers * 0.5
 	node_kmers_to_query = []
