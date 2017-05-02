@@ -197,7 +197,7 @@ if __name__=="__main__":
 	
 	taxonid_to_dumpsfilenames, tree = get_tree('name_ftpdirpaths', num_taxons)
 	num_nodes = len(list(tree.traverse()))
-	print('Tree has ' + str(num_nodes) + ' nodes.')
+	print('Tree has ' + str(num_nodes) + ' nodes')
 	
 	command = sys.argv[2]
 	
