@@ -51,7 +51,7 @@ def get_taxonid_to_dumpsfilenames(name_ftpdirpaths_filename):
 				taxonid = listtaxonid[0]
 				taxonid_to_dumpsfilenames[taxonid].append(dumpsfilename)
 			if name == 'Mycobacterium intracellulare MOTT-64': #upon further inspection, this name in assembly_summary.txt is curiously absent from NCBI
-				print(name+' is not in the NCBI database.')
+				print(name+' is not in the NCBI database')
 				sys.stdout.flush()
 		else:
 			taxonid = listtaxonid[0]
