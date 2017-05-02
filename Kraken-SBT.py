@@ -124,7 +124,7 @@ def construct_bloomfilters(tree):
 			delattr(node, 'bf')
 
 #query the tree
-def query_tree(tree, query):
+def query_tree(tree, query, threshold):
 	
 	def get_query_kmers(query):
 		querykmers = []
@@ -172,7 +172,7 @@ def query_tree(tree, query):
 	responses = {}
 	querykmers = get_query_kmers(querytaxonid)
 	num_kmers = len(querykmers)
-	threshold = num_kmers * 0.5
+	threshold = num_kmers * threshold
 	node_kmers_to_query = []
 	node_kmers_to_query.append((tree,querykmers))
 	num_queried = 0
@@ -217,4 +217,5 @@ if __name__=="__main__":
 	
 	if command == "query":
 		querytaxonid = sys.argv[3]
-		print(query_tree(tree, querytaxonid))
+		threshold = float(sys.argv[4])
+		print(query_tree(tree, querytaxonid, threshold))
