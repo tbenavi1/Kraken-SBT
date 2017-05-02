@@ -31,11 +31,11 @@ python Kraken-SBT 0 bloomfilters
 Running on the entire dataset will take an inordinate amount of time and memory. This is only necessary for the developer.
 
 ## Querying the tree
-To query the tree for a given taxonid (e.g. 385025), run:
+To query the tree for a given taxonid (e.g. 385025), and return the nodes for which the proportion of matching query kmers exceeds a given threshold, run:
 ```bash
-python Kraken-SBT 0 query 385025
+python Kraken-SBT 0 query 385025 threshold
 ```
-To query the tree for a jellyfish dumps file containing a set of kmers, run:
+To query the tree for a jellyfish dumps file containing a set of kmers, and return the nodes for which the proportion of matching query kmers exceeds a given threshold, run:
 ```bash
-python Kraken_SBT 0 query queryfilename
+python Kraken_SBT 0 query queryfilename threshold
 ```
