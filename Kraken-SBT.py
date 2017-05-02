@@ -66,7 +66,6 @@ def bf_from_bvfilename(bvfilename):
 	return bf
 
 def get_tree(name_ftpdirpaths_filename,num_taxons = 0):
-	ncbi = NCBITaxa()
 	taxonid_to_dumpsfilenames = get_taxonid_to_dumpsfilenames(name_ftpdirpaths_filename)
 	
 	#get the desired number of unique taxonids, in order to create the phylogeny tree
@@ -76,7 +75,7 @@ def get_tree(name_ftpdirpaths_filename,num_taxons = 0):
 		taxonids = taxonids[:num_taxons] #smaller set of taxonids for tree construction and testing
 	
 	#return desired phylogeny tree
-	return ncbi.get_topology(taxonids) #5,360 total nodes for full dataset
+	return taxonid_to_dumpsfilenames, ncbi.get_topology(taxonids) #5,360 total nodes for full dataset
 
 def construct_bloomfilters(tree):
 		
@@ -193,7 +192,7 @@ if __name__=="__main__":
 	
 	num_taxons = sys.argv[1]
 	
-	tree = get_tree('name_ftpdirpaths', num_taxons)
+	taxonid_to_dumpsfilenames, tree = get_tree('name_ftpdirpaths', num_taxons)
 	
 	command = sys.argv[2]
 	
