@@ -9,10 +9,29 @@
 
 ## Setting up your environment
 Running:
-~~~bash
+```bash
 sh setup.sh
-~~~
+```
 will first download the 6,741 complete RefSeq bacterial genomes into a directory called Bacteria_Genomes. Then, it will run jellyfish count and jellyfish dump to get the kmer dumps files for each of the genomes.
 Note: This will take a very long time and it is not necessary for the typical end user. This is only necessary for the developer.
 
 ## Running for the first time
+Kraken-SBT can run on the full dataset (~5400 nodes), or on a subset of the nodes. To run on the full dataset the first command should be "0". To run on a subset, the first command should be the number of nodes desired. For instance:
+```bash
+python Kraken-SBT 0
+```
+or:
+```bash
+python Kraken-SBT 10
+```
+To construct the bloomfilters for the first time, run:
+```bash
+python Kraken-SBT 0 bloomfilters
+```
+Running on the entire dataset will take an inordinate amount of time and memory. This is only necessary for the developer.
+
+## Querying the tree
+To query the tree for a given taxonid (e.g. 385025), run:
+```bash
+python Kraken-SBT 0 query 385025
+```
