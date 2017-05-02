@@ -147,7 +147,7 @@ def query_tree(tree, query, threshold):
 				i += 1
 				kmer = line.strip().split(' ')[0]
 				querykmers.append(kmer)
-				if i = 100000:
+				if i == 100000:
 					break
 		return querykmers
 	
