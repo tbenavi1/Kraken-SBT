@@ -214,15 +214,16 @@ if __name__=="__main__":
 	
 	ncbi = NCBITaxa()
 	
-	num_taxons = int(sys.argv[1])
+	command = sys.argv[1]
 	
-	taxonid_to_dumpsfilenames, tree = get_tree('name_ftpdirpaths', num_taxons)
-	num_nodes = len(list(tree.traverse()))
-	print('Tree has ' + str(num_nodes) + ' nodes')
+	num_taxons = int(sys.argv[2])
 	
-	command = sys.argv[2]
+	if command:
+		taxonid_to_dumpsfilenames, tree = get_tree('name_ftpdirpaths', num_taxons)
+		num_nodes = len(list(tree.traverse()))
+		print('Tree has ' + str(num_nodes) + ' nodes')
 	
-	if command == "bloomfilter":
+	if command == "bloomfilters":
 		#construct the bloomfilters (only necessary for the first time building the database)
 		#actually, the end user never needs to perform this step, since they will download the bloom filters from the beginning
 		construct_bloomfilters(tree)
