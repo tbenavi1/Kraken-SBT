@@ -165,6 +165,7 @@ def query_tree(tree, querytaxonid):
 	threshold = num_kmers * 0.5
 	node_kmers_to_query = []
 	node_kmers_to_query.append((tree,querykmers))
+	num_queried = 0
 	while node_kmers_to_query:
 		current_node, current_kmers = node_kmers_to_query.pop()
 		current_taxonid = int(current_node.name)
@@ -177,6 +178,7 @@ def query_tree(tree, querytaxonid):
 			sys.stdout.flush()
 		else:
 			children = current_node.children
+			num_queried += 1
 			node_kmers = get_next_node_kmers(children, current_kmers, threshold)
 			if node_kmers == []:
 				responses[current_name] = len(current_kmers)/num_kmers
@@ -184,6 +186,7 @@ def query_tree(tree, querytaxonid):
 				sys.stdout.flush()
 			else:
 				node_kmers_to_query.extend(node_kmers)
+	print(str(num_queried) + ' nodes queried out of ' + str(num_nodes))
 	return sorted(responses.items(), key = operator.itemgetter(1), reverse = True)
 
 if __name__=="__main__":
@@ -193,7 +196,8 @@ if __name__=="__main__":
 	num_taxons = sys.argv[1]
 	
 	taxonid_to_dumpsfilenames, tree = get_tree('name_ftpdirpaths', num_taxons)
-	print('Tree has ' + str(len(list(tree.traverse()))) + ' nodes.')
+	num_nodes = len(list(tree.traverse()))
+	print('Tree has ' + str(num_nodes) + ' nodes.')
 	
 	command = sys.argv[2]
 	
