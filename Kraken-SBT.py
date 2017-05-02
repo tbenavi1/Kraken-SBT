@@ -202,7 +202,7 @@ if __name__=="__main__":
 	
 	ncbi = NCBITaxa()
 	
-	num_taxons = sys.argv[1]
+	num_taxons = int(sys.argv[1])
 	
 	taxonid_to_dumpsfilenames, tree = get_tree('name_ftpdirpaths', num_taxons)
 	num_nodes = len(list(tree.traverse()))
