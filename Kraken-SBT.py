@@ -142,9 +142,13 @@ def query_tree(tree, query, threshold):
 			queryfilename = query
 			print('Query filename is ' + queryfilename)
 			sys.stdout.flush()
+			i = 0
 			for line in open(queryfilename):
+				i += 1
 				kmer = line.strip().split(' ')[0]
 				querykmers.append(kmer)
+				if i = 100000:
+					break
 		return querykmers
 	
 	def get_next_node_kmers(children, current_kmers, threshold, num_queried):
