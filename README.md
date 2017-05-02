@@ -5,7 +5,7 @@
 2. ete3 (for NCBI taxonomy tree) from http://etetoolkit.org/download/
 3. bitarray from https://pypi.python.org/pypi/bitarray/
 4. mmh3 from https://pypi.python.org/pypi/mmh3/2.3.1
-5. Jellyfish 2 from http://www.genome.umd.edu/jellyfish.html
+5. jellyfish 2 from http://www.genome.umd.edu/jellyfish.html
 
 ## Setting up your environment
 Running:
