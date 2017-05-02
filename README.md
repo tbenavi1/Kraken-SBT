@@ -20,7 +20,7 @@ Kraken-SBT can run on the full dataset (~4500 taxonids), or on a subset of the t
 ```bash
 python Kraken-SBT buildtree 0
 ```
-To build the tree on a subset, the first argument of buildtree should be the number of taxonids desired. For instance:
+To build the tree on a subset, the first argument of buildtree should be the desired number of taxonids. For instance:
 ```bash
 python Kraken-SBT buildtree 10
 ```
@@ -36,7 +36,7 @@ To query the full tree for a given taxonid (e.g. 385025), and return the nodes f
 ```bash
 python Kraken-SBT query 0 385025 threshold
 ```
-To query the full tree for a jellyfish dumps file containing a set of kmers, and return the nodes for which the proportion of matching query kmers exceeds a given threshold, run:
+To query the full tree for a given jellyfish dumps file containing a set of kmers, and return the nodes for which the proportion of matching query kmers exceeds a given threshold, run:
 ```bash
 python Kraken_SBT query 0 queryfilename threshold
 ```
