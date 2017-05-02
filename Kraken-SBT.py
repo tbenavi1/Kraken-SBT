@@ -145,6 +145,7 @@ def query_tree(tree, querytaxonid):
 			name = ncbi.translate_to_names([taxonid])[0]
 			edited_name = name.replace(' ', '_').replace('/', '_')
 			bv_filename = edited_name + '.bv'
+			num_queried += 1
 			print('Loading ' + name)
 			sys.stdout.flush()
 			child.bf = bf_from_bvfilename(bv_filename)
@@ -178,7 +179,6 @@ def query_tree(tree, querytaxonid):
 			sys.stdout.flush()
 		else:
 			children = current_node.children
-			num_queried += 1
 			node_kmers = get_next_node_kmers(children, current_kmers, threshold)
 			if node_kmers == []:
 				responses[current_name] = len(current_kmers)/num_kmers
