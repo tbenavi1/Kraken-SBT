@@ -16,7 +16,7 @@ will first download the 6,741 complete RefSeq bacterial genomes into a directory
 Note: This will take a very long time and it is not necessary for the typical end user. This is only necessary for the developer.
 
 ## Running for the first time
-Kraken-SBT can run on the full dataset (~5400 nodes), or on a subset of the nodes. To run on the full dataset the first command should be "0". To run on a subset, the first command should be the number of nodes desired. For instance:
+Kraken-SBT can run on the full dataset (~4500 taxonids), or on a subset of the taxonids. To run on the full dataset the first command should be "0". To run on a subset, the first command should be the number of taxonids desired. For instance:
 ```bash
 python Kraken-SBT 0
 ```
