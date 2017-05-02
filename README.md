@@ -35,3 +35,7 @@ To query the tree for a given taxonid (e.g. 385025), run:
 ```bash
 python Kraken-SBT 0 query 385025
 ```
+To query the tree for a file containing a set of kmers, run:
+```bash
+python Kraken_SBT 0 query queryfilename
+```
