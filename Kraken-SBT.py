@@ -1,10 +1,13 @@
 from bitarray import bitarray
 from collections import defaultdict
 from ete3 import NCBITaxa
+from multiprocessing import Pool
 import mmh3
 import operator
 import os
+import queue
 import sys
+import threading
 
 class BloomFilter:
 	
@@ -153,56 +156,92 @@ def query_tree(tree, query, threshold):
 					break
 		return querykmers
 	
-	def get_next_node_kmers(children, current_kmers, threshold, num_queried):
-		node_kmers = []
-		for child in children:
-			taxonid = int(child.name)
-			name = ncbi.translate_to_names([taxonid])[0]
-			edited_name = name.replace(' ', '_').replace('/', '_')
-			bv_filename = edited_name + '.bv'
-			num_queried += 1
-			print('Loading ' + name)
-			sys.stdout.flush()
-			child.bf = bf_from_bvfilename(bv_filename)
-			print(name + ' loaded')
-			sys.stdout.flush()
-			kmer_matches = []
-			for kmer in current_kmers:
-				if child.bf.contains(kmer):
-					kmer_matches.append(kmer)
-			delattr(child, 'bf')
-			if len(kmer_matches) > threshold:
-				node_kmers.append((child, kmer_matches))
-		return num_queried, node_kmers
+	def get_kmer_matches((children, current_kmers, threshold, num_queried)):
+		taxonid = int(child.name)
+		name = ncbi.translate_to_names([taxonid])[0]
+		edited_name = name.replace(' ', '_').replace('/', '_')
+		bv_filename = edited_name + '.bv'
+		num_queried.append(1)
+		print('Loading ' + name)
+		sys.stdout.flush()
+		child.bf = bf_from_bvfilename(bv_filename)
+		print(name + ' loaded')
+		sys.stdout.flush()
+		kmer_matches = []
+		for kmer in current_kmers:
+			if child.bf.contains(kmer):
+				kmer_matches.append(kmer)
+		delattr(child, 'bf')
+		if len(kmer_matches) > threshold:
+			return (child, kmer_matches)
 	
-	responses = {}
+	def get_next_node_kmers(children, current_kmers, threshold, num_queried):
+		return [item for item in Pool().map(get_kmer_matches, [(child, current_kmers, threshold, num_queried) for child in children]) if item is not None]
+	
+	def analyze_node(q):
+		while not exitFlag:
+			queueLock.acquire()
+			if not workQueue.empty():
+				current_node, current_kmers = q.get()
+				queueLock.release()
+				current_taxonid = int(current_node.name)
+				current_name = ncbi.translate_to_names([current_taxonid])[0]
+				print('Current node: ' + current_name)
+				if current_node.is_leaf():
+					responses[current_name] = len(current_kmers)/num_kmers
+					print('Proportion of query kmers matching ' + current_name + ': ' + str(len(current_kmers)/num_kmers))
+					sys.stdout.flush()
+				else:
+					children = current_node.children
+					num_queried, node_kmers = get_next_node_kmers(children, current_kmers, threshold, num_queried)
+					if node_kmers == []:
+						responses[current_name] = len(current_kmers)/num_kmers
+						print('Proportion of query kmers matching ' + current_name + ': ' + str(len(current_kmers)/num_kmers))
+						sys.stdout.flush()
+					else:
+						queueLock.acquire()
+						for (child, kmer_matches) in node_kmers:
+							workQueue.put((child, kmer_matches))
+						queueLock.release()
+			else:
+				queueLock.release()
+	
+	#get query kmers and threshold
 	querykmers = get_query_kmers(querytaxonid)
 	num_kmers = len(querykmers)
 	threshold = num_kmers * threshold
-	node_kmers_to_query = []
-	node_kmers_to_query.append((tree,querykmers))
-	num_queried = 0
-	while node_kmers_to_query:
-		current_node, current_kmers = node_kmers_to_query.pop()
-		current_taxonid = int(current_node.name)
-		current_name = ncbi.translate_to_names([current_taxonid])[0]
-		print('Current node: ' + current_name)
-		sys.stdout.flush()
-		if current_node.is_leaf():
-			responses[current_name] = len(current_kmers)/num_kmers
-			print('Proportion of query kmers matching ' + current_name + ': ' + str(len(current_kmers)/num_kmers))
-			sys.stdout.flush()
-		else:
-			children = current_node.children
-			num_queried, node_kmers = get_next_node_kmers(children, current_kmers, threshold, num_queried)
-			if node_kmers == []:
-				responses[current_name] = len(current_kmers)/num_kmers
-				print('Proportion of query kmers matching ' + current_name + ': ' + str(len(current_kmers)/num_kmers))
-				sys.stdout.flush()
-			else:
-				node_kmers_to_query.extend(node_kmers)
-	print(str(num_queried) + ' nodes queried out of ' + str(num_nodes))
-	return sorted(responses.items(), key = operator.itemgetter(1), reverse = True)
+	
+	#initialize variables
+	responses = {}
+	num_threads = 3
+	threads = []
+	queueLock = threading.Lock()
+	exitFlag = 0
+	num_queried = []
+	
+	#create and initialize the queue
+	workQueue = queue.Queue()
+	workQueue.put((tree,querykmers))
+	
+	#create new threads
+	for _ in range(len(num_threads)):
+		thread = threading.Thread(target = analyze_node, args = (workQueue))
+		thread.start()
+		threads.append(thread)
+	
+	#wait for queue to empty
+	while not workQueue.empty():
+		pass
+	
+	#notify threads it's time to exit
+	exitFlag = 1
+	
+	#wait for all threads to complete
+	for t in threads:
+		t.join()
+	
+	print(str(sum(num_queried)) + ' nodes queried out of ' + str(num_nodes))
+	print(sorted(responses.items(), key = operator.itemgetter(1), reverse = True))
 
 if __name__=="__main__":
 	
