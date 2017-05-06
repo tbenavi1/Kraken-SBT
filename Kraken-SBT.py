@@ -258,7 +258,7 @@ def query_tree(tree, query, threshold):
 	
 	num_queried = queried.get()
 	print(str(num_queried) + ' nodes queried out of ' + str(numnodes))
-	print(sorted(responses.items(), key = operator.itemgetter(1), reverse = True))
+	return sorted(responses.items(), key = operator.itemgetter(1), reverse = True)
 
 if __name__=="__main__":
 	
@@ -281,4 +281,5 @@ if __name__=="__main__":
 	if command == "query":
 		querytaxonid = sys.argv[3]
 		threshold = float(sys.argv[4])
-		print(query_tree(tree, querytaxonid, threshold))
+		matches = query_tree(tree, querytaxonid, threshold)
+		print(matches)
