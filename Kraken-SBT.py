@@ -42,7 +42,8 @@ def get_taxonid_to_readfilenames(name_ftpdirpaths_filename):
 		splits = line.strip().split(' ') #split on each of the spaces
 		name = ' '.join(splits[:-1]) #concatenate everything before the last space
 		ftpdirpath = splits[-1] #everything after the last space
-		readfilename = './Bacteria_Genomes/' + ftpdirpath.split('/')[-1] + '_genomic.fna.gz'
+		#readfilename = './Bacteria_Genomes/' + ftpdirpath.split('/')[-1] + '_genomic.fna.gz'
+		readfilename = './Bacteria_Genomes/' + ftpdirpath.split('/')[-1] + '_genomic.fna'
 		name_to_listtaxonid = ncbi.get_name_translator([name]) #a dictionary with name as key and [taxonid] as value
 		listtaxonid = [taxonid for [taxonid] in name_to_listtaxonid.values()]
 		if listtaxonid == []:
@@ -157,7 +158,8 @@ def construct_bloomfilters(tree, bloomfiltersizes):
 			j = 0
 			for line in open(descendantfilenames_filename):
 				j += 1
-				descendant_filename = line.strip()
+				#descendant_filename = line.strip()
+				descendant_filename = line.strip() + '.dumps'
 				print('Reading file ' + str(j))
 				for line2 in open(descendant_filename):
 					kmer = line2.strip().split(' ')[0]
