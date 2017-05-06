@@ -1,7 +1,7 @@
 from bitarray import bitarray
 from collections import defaultdict
 from ete3 import NCBITaxa
-from multiprocessing import Pool
+from multiprocessing import Pool, Value
 import mmh3
 import operator
 import os
@@ -128,87 +128,106 @@ def construct_bloomfilters(tree):
 			f.close()
 			delattr(node, 'bf')
 
-#query the tree
-def query_tree(tree, query, threshold):
-	
-	def get_query_kmers(query):
-		querykmers = []
-		try:
-			querytaxonid = int(query)
-			queryname = ncbi.translate_to_names([querytaxonid])[0]
-			print('Query name is ' + queryname)
-			sys.stdout.flush()
-			querydumpsfilenames = taxonid_to_dumpsfilenames[querytaxonid]
-			for querydumpsfilename in querydumpsfilenames:
-				for line in open(querydumpsfilename):
-					kmer = line.strip().split(' ')[0]
-					querykmers.append(kmer)
-		except:
-			queryfilename = query
-			print('Query filename is ' + queryfilename)
-			sys.stdout.flush()
-			i = 0
-			for line in open(queryfilename):
-				i += 1
+def get_query_kmers(query):
+	querykmers = []
+	try:
+		querytaxonid = int(query)
+		queryname = ncbi.translate_to_names([querytaxonid])[0]
+		print('Query name is ' + queryname)
+		sys.stdout.flush()
+		querydumpsfilenames = taxonid_to_dumpsfilenames[querytaxonid]
+		for querydumpsfilename in querydumpsfilenames:
+			for line in open(querydumpsfilename):
 				kmer = line.strip().split(' ')[0]
 				querykmers.append(kmer)
-				if i == 100000:
-					break
-		return querykmers
-	
-	def get_kmer_matches((children, current_kmers, threshold, num_queried)):
-		taxonid = int(child.name)
-		name = ncbi.translate_to_names([taxonid])[0]
-		edited_name = name.replace(' ', '_').replace('/', '_')
-		bv_filename = edited_name + '.bv'
-		num_queried.append(1)
-		print('Loading ' + name)
+	except:
+		queryfilename = query
+		print('Query filename is ' + queryfilename)
 		sys.stdout.flush()
-		child.bf = bf_from_bvfilename(bv_filename)
-		print(name + ' loaded')
-		sys.stdout.flush()
-		kmer_matches = []
-		for kmer in current_kmers:
-			if child.bf.contains(kmer):
-				kmer_matches.append(kmer)
-		delattr(child, 'bf')
-		if len(kmer_matches) > threshold:
-			return (child, kmer_matches)
-	
-	def get_next_node_kmers(children, current_kmers, threshold, num_queried):
-		return [item for item in Pool().map(get_kmer_matches, [(child, current_kmers, threshold, num_queried) for child in children]) if item is not None]
-	
-	def analyze_node(q):
-		while not exitFlag:
-			queueLock.acquire()
-			if not workQueue.empty():
-				current_node, current_kmers = q.get()
-				queueLock.release()
-				current_taxonid = int(current_node.name)
-				current_name = ncbi.translate_to_names([current_taxonid])[0]
-				print('Current node: ' + current_name)
-				if current_node.is_leaf():
+		i = 0
+		for line in open(queryfilename):
+			i += 1
+			kmer = line.strip().split(' ')[0]
+			querykmers.append(kmer)
+			if i == 100000:
+				break
+	return querykmers
+
+def get_kmer_matches(child, current_kmers, threshold):
+	ncbi = NCBITaxa()
+	taxonid = int(child.name)
+	name = ncbi.translate_to_names([taxonid])[0]
+	edited_name = name.replace(' ', '_').replace('/', '_')
+	bv_filename = edited_name + '.bv'
+	print('Loading ' + name)
+	sys.stdout.flush()
+	child.bf = bf_from_bvfilename(bv_filename)
+	print(name + ' loaded')
+	sys.stdout.flush()
+	kmer_matches = []
+	for kmer in current_kmers:
+		if child.bf.contains(kmer):
+			kmer_matches.append(kmer)
+	delattr(child, 'bf')
+	if len(kmer_matches) > threshold:
+		return (child, kmer_matches)
+
+def get_next_node_kmers(children, current_kmers, threshold):
+	return [item for item in Pool().starmap(get_kmer_matches, [(child, current_kmers, threshold) for child in children]) if item is not None]
+
+def analyze_node(q, queried, queueLock, workQueue, threshold, num_kmers, responses, still_working, counterLock, queriedLock):
+	while not (still_working == 0 and workQueue.empty()):
+		queueLock.acquire()
+		if not workQueue.empty():
+			current_node, current_kmers = q.get()
+			with counterLock:
+				still_working += 1
+			queueLock.release()
+			ncbi = NCBITaxa()
+			current_taxonid = int(current_node.name)
+			current_name = ncbi.translate_to_names([current_taxonid])[0]
+			print('Current node: ' + current_name)
+			if current_node.is_leaf():
+				responses[current_name] = len(current_kmers)/num_kmers
+				print('Proportion of query kmers matching ' + current_name + ': ' + str(len(current_kmers)/num_kmers))
+				sys.stdout.flush()
+				with counterLock:
+					still_working -= 1
+			else:
+				children = current_node.children
+				node_kmers = get_next_node_kmers(children, current_kmers, threshold)
+				queriedLock.acquire()
+				num_queried = queried.get()
+				num_queried += len(children)
+				queried.put(num_queried)
+				queriedLock.release()
+				if node_kmers == []:
 					responses[current_name] = len(current_kmers)/num_kmers
 					print('Proportion of query kmers matching ' + current_name + ': ' + str(len(current_kmers)/num_kmers))
 					sys.stdout.flush()
+					with counterLock:
+						still_working -= 1
 				else:
-					children = current_node.children
-					num_queried, node_kmers = get_next_node_kmers(children, current_kmers, threshold, num_queried)
-					if node_kmers == []:
-						responses[current_name] = len(current_kmers)/num_kmers
-						print('Proportion of query kmers matching ' + current_name + ': ' + str(len(current_kmers)/num_kmers))
-						sys.stdout.flush()
-					else:
-						queueLock.acquire()
-						for (child, kmer_matches) in node_kmers:
-							workQueue.put((child, kmer_matches))
-						queueLock.release()
-			else:
-				queueLock.release()
+					queueLock.acquire()
+					for (child, kmer_matches) in node_kmers:
+						workQueue.put((child, kmer_matches))
+						print('adding')
+					with counterLock:
+						still_working -= 1
+					queueLock.release()
+		else:
+			with counterLock:
+				still_working -= 1
+			queueLock.release()
+	return
+
+#query the tree
+def query_tree(tree, query, threshold):
 	
 	#get query kmers and threshold
-	querykmers = get_query_kmers(querytaxonid)
+	querykmers = get_query_kmers(query)
 	num_kmers = len(querykmers)
+	print('num_kmers', num_kmers)
 	threshold = num_kmers * threshold
 	
 	#initialize variables
@@ -216,31 +235,29 @@ def query_tree(tree, query, threshold):
 	num_threads = 3
 	threads = []
 	queueLock = threading.Lock()
-	exitFlag = 0
-	num_queried = []
+	counterLock = threading.Lock()
+	queriedLock = threading.Lock()
+	queried = queue.Queue()
+	queried.put(0)
+	numnodes = len(list(tree.traverse()))
 	
 	#create and initialize the queue
 	workQueue = queue.Queue()
 	workQueue.put((tree,querykmers))
+	still_working = 0
 	
 	#create new threads
-	for _ in range(len(num_threads)):
-		thread = threading.Thread(target = analyze_node, args = (workQueue))
+	for _ in range(num_threads):
+		thread = threading.Thread(target = analyze_node, args = (workQueue,queried, queueLock, workQueue, threshold, num_kmers, responses, still_working, counterLock, queriedLock))
 		thread.start()
 		threads.append(thread)
-	
-	#wait for queue to empty
-	while not workQueue.empty():
-		pass
-	
-	#notify threads it's time to exit
-	exitFlag = 1
 	
 	#wait for all threads to complete
 	for t in threads:
 		t.join()
 	
-	print(str(sum(num_queried)) + ' nodes queried out of ' + str(num_nodes))
+	num_queried = queried.get()
+	print(str(num_queried) + ' nodes queried out of ' + str(numnodes))
 	print(sorted(responses.items(), key = operator.itemgetter(1), reverse = True))
 
 if __name__=="__main__":
