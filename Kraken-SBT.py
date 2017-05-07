@@ -35,7 +35,8 @@ class BloomFilter:
 #recall: command to generate name_ftpdirpaths from assembly_summary.txt (ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt) is given below:
 #awk -F "\t" '$12=="Complete Genome" && $11=="latest"{print $8, $20}' assembly_summary.txt > name_ftpdirpaths
 #each line of name_ftpdirpaths is space delimited; everything before the last space is the taxon name ($8), everything after the last space is the ftpdirpath ($20)
-def get_taxonid_to_readfilenames(name_ftpdirpaths_filename): 
+def get_taxonid_to_readfilenames(name_ftpdirpaths_filename):
+	ncbi = NCBITaxa()
 	#search through all the data files and create a dictionary that maps taxonids to readfilenames
 	taxonid_to_readfilenames = defaultdict(list) #a given taxonid may map to multiple readfiles, thus each value in the dictionary is a list
 	for line in open(name_ftpdirpaths_filename):
@@ -72,6 +73,7 @@ def bf_from_bvfilename(bv_filename):
 	return bf
 
 def get_tree(name_ftpdirpaths_filename,num_taxons = 0):
+	ncbi = NCBITaxa()
 	taxonid_to_readfilenames = get_taxonid_to_readfilenames(name_ftpdirpaths_filename)
 	
 	#get the desired number of unique taxonids, in order to create the phylogeny tree
@@ -84,6 +86,7 @@ def get_tree(name_ftpdirpaths_filename,num_taxons = 0):
 	return taxonid_to_readfilenames, ncbi.get_topology(taxonids) #5,360 total nodes for full dataset
 
 def write_descendantfiles(tree):
+	ncbi = NCBITaxa()
 	i=0
 	numnodes = len(list(tree.traverse()))
 	for node in tree.traverse():
@@ -132,13 +135,14 @@ def read_bloomfiltersizes(bloomfiltersizes_filename):
 	bloomfiltersizes = {}
 	for line in open(bloomfiltersizes_filename):
 		edited_name, size = line.strip().split(' ')
-		bloomfiltersizes[edited_name] = size
+		bloomfiltersizes[edited_name] = int(size)
 	return bloomfiltersizes
 	
 def construct_bloomfilters(tree, bloomfiltersizes):
+	ncbi = NCBITaxa()
 	i=0
-	numnodes = len(list(tree.traverse()))
-	for node in tree.traverse():
+	numnodes = len(list(tree.get_descendants()))
+	for node in tree.get_descendants():
 		i+=1
 		taxonid = int(node.name)
 		name = ncbi.translate_to_names([taxonid])[0]
@@ -170,6 +174,7 @@ def construct_bloomfilters(tree, bloomfiltersizes):
 			delattr(node, 'bf')
 
 def get_query_kmers(query):
+	ncbi = NCBITaxa()
 	querykmers = []
 	try:
 		querytaxonid = int(query)
@@ -303,7 +308,7 @@ def query_tree(tree, query, threshold):
 
 if __name__=="__main__":
 	
-	ncbi = NCBITaxa()
+	#ncbi = NCBITaxa()
 	
 	command = sys.argv[1]
 	
