@@ -242,6 +242,7 @@ def analyze_node(q, queried, queueLock, workQueue, threshold, num_kmers, respons
 				with queueLock:
 					for child in current_node.children:
 						workQueue.put((child, current_kmers))
+						print('adding')
 					with counterLock:
 						still_working -= 1
 			elif current_node.is_leaf():
