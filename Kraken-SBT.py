@@ -292,7 +292,7 @@ def query_tree(tree, query, threshold, taxonid_to_readfilenames):
 	numnodes = len(list(tree.traverse()))
 	
 	#create and initialize the queue and locks
-	workQueue = queue.Queue()
+	workQueue = queue.Queue() #this "work" queue contains all the nodes and corresponding matching kmers for each query path down the tree
 	queueLock = threading.Lock()
 	workQueue.put((tree,querykmers))
 	
