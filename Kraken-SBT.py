@@ -1,7 +1,7 @@
 from bitarray import bitarray
 from collections import defaultdict
 from ete3 import NCBITaxa
-from multiprocessing import Pool, Value
+from multiprocessing import Pool
 import mmh3
 import operator
 import os
