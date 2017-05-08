@@ -173,7 +173,7 @@ def construct_bloomfilters(tree, bloomfiltersizes):
 			f.close()
 			delattr(node, 'bf')
 
-def get_query_kmers(query):
+def get_query_kmers(query, taxonid_to_readfilenames):
 	ncbi = NCBITaxa()
 	querykmers = []
 	try:
@@ -181,8 +181,9 @@ def get_query_kmers(query):
 		queryname = ncbi.translate_to_names([querytaxonid])[0]
 		print('Query name is ' + queryname)
 		sys.stdout.flush()
-		querydumpsfilenames = taxonid_to_dumpsfilenames[querytaxonid]
-		for querydumpsfilename in querydumpsfilenames:
+		queryreadfilenames = taxonid_to_readfilenames[querytaxonid]
+		for queryreadfilename in queryreadfilenames:
+			querydumpsfilename = queryreadfilename + '.dumps'
 			for line in open(querydumpsfilename):
 				kmer = line.strip().split(' ')[0]
 				querykmers.append(kmer)
@@ -203,6 +204,8 @@ def get_kmer_matches(child, current_kmers, threshold):
 	ncbi = NCBITaxa()
 	taxonid = int(child.name)
 	name = ncbi.translate_to_names([taxonid])[0]
+	if name == 'Proteobacteria':
+		return (child, current_kmers)
 	edited_name = name.replace(' ', '_').replace('/', '_')
 	bv_filename = edited_name + '.bv'
 	print('Loading ' + name)
@@ -219,7 +222,9 @@ def get_kmer_matches(child, current_kmers, threshold):
 		return (child, kmer_matches)
 
 def get_next_node_kmers(children, current_kmers, threshold):
-	return [item for item in Pool().starmap(get_kmer_matches, [(child, current_kmers, threshold) for child in children]) if item is not None]
+	with Pool() as p:
+		results = [item for item in p.starmap(get_kmer_matches, [(child, current_kmers, threshold) for child in children]) if item is not None]
+	return results
 
 def analyze_node(q, queried, queueLock, workQueue, threshold, num_kmers, responses, still_working, counterLock, queriedLock):
 	while not (still_working == 0 and workQueue.empty()):
@@ -233,7 +238,13 @@ def analyze_node(q, queried, queueLock, workQueue, threshold, num_kmers, respons
 			current_taxonid = int(current_node.name)
 			current_name = ncbi.translate_to_names([current_taxonid])[0]
 			print('Current node: ' + current_name)
-			if current_node.is_leaf():
+			if current_name == 'Proteobacteria':
+				with queueLock:
+					for child in current_node.children:
+						workQueue.put((child, current_kmers))
+					with counterLock:
+						still_working -= 1
+			elif current_node.is_leaf():
 				responses[current_name] = len(current_kmers)/num_kmers
 				print('Proportion of query kmers matching ' + current_name + ': ' + str(len(current_kmers)/num_kmers))
 				sys.stdout.flush()
@@ -242,11 +253,10 @@ def analyze_node(q, queried, queueLock, workQueue, threshold, num_kmers, respons
 			else:
 				children = current_node.children
 				node_kmers = get_next_node_kmers(children, current_kmers, threshold)
-				queriedLock.acquire()
-				num_queried = queried.get()
-				num_queried += len(children)
-				queried.put(num_queried)
-				queriedLock.release()
+				with queriedLock:
+					num_queried = queried.get()
+					num_queried += len(children)
+					queried.put(num_queried)
 				if node_kmers == []:
 					responses[current_name] = len(current_kmers)/num_kmers
 					print('Proportion of query kmers matching ' + current_name + ': ' + str(len(current_kmers)/num_kmers))
@@ -254,13 +264,12 @@ def analyze_node(q, queried, queueLock, workQueue, threshold, num_kmers, respons
 					with counterLock:
 						still_working -= 1
 				else:
-					queueLock.acquire()
-					for (child, kmer_matches) in node_kmers:
-						workQueue.put((child, kmer_matches))
-						print('adding')
-					with counterLock:
-						still_working -= 1
-					queueLock.release()
+					with queueLock:
+						for (child, kmer_matches) in node_kmers:
+							workQueue.put((child, kmer_matches))
+							print('adding')
+						with counterLock:
+							still_working -= 1
 		else:
 			with counterLock:
 				still_working -= 1
@@ -268,10 +277,10 @@ def analyze_node(q, queried, queueLock, workQueue, threshold, num_kmers, respons
 	return
 
 #query the tree
-def query_tree(tree, query, threshold):
+def query_tree(tree, query, threshold, taxonid_to_readfilenames):
 	
 	#get query kmers and threshold
-	querykmers = get_query_kmers(query)
+	querykmers = get_query_kmers(query, taxonid_to_readfilenames)
 	num_kmers = len(querykmers)
 	print('num_kmers', num_kmers)
 	threshold = num_kmers * threshold
@@ -315,7 +324,7 @@ if __name__=="__main__":
 	num_taxons = int(sys.argv[2])
 	
 	if command:
-		taxonid_to_dumpsfilenames, tree = get_tree('name_ftpdirpaths', num_taxons)
+		taxonid_to_readfilenames, tree = get_tree('name_ftpdirpaths', num_taxons)
 		num_nodes = len(list(tree.traverse()))
 		print('Tree has ' + str(num_nodes) + ' nodes')
 	
@@ -329,5 +338,5 @@ if __name__=="__main__":
 	if command == "query":
 		querytaxonid = sys.argv[3]
 		threshold = float(sys.argv[4])
-		matches = query_tree(tree, querytaxonid, threshold)
+		matches = query_tree(tree, querytaxonid, threshold, taxonid_to_readfilenames)
 		print(matches)
