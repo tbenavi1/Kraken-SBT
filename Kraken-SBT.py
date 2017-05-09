@@ -203,34 +203,39 @@ def get_query_kmers(query, taxonid_to_readfilenames):
 def get_kmer_matches(childrenQueue, childrenLock, counterLock2, still_working2, results):
 	while not (still_working2 == 0 and childrenQueue.empty()):
 		ncbi = NCBITaxa()
-		with childrenLock:
+		childrenLock.acquire()
 			if not childrenQueue.empty():
 				child, current_kmers, threshold = childrenQueue.get()
 				with counterLock2:
 					still_working2 += 1
-		taxonid = int(child.name)
-		name = ncbi.translate_to_names([taxonid])[0]
-		if name == 'Proteobacteria':
-			results.append((child, current_kmers))
-			with counterLock2:
-				still_working2 -= 1
-		else:
-			edited_name = name.replace(' ', '_').replace('/', '_')
-			bv_filename = edited_name + '.bv'
-			print('Loading ' + name)
-			sys.stdout.flush()
-			child.bf = bf_from_bvfilename(bv_filename) #load bloom filter from bitvector
-			print(name + ' loaded')
-			sys.stdout.flush()
-			kmer_matches = []
-			for kmer in current_kmers: #figure out how many kmers of query match the current bloom filter
-				if child.bf.contains(kmer):
-					kmer_matches.append(kmer)
-			delattr(child, 'bf') #remove bloom filter from memory
-			if len(kmer_matches) > threshold: # if number of kmers that match exceeds threshold, add this child and matching kmers to the work queue
-				results.append((child, kmer_matches))
-			with counterLock2:
-				still_working2 -= 1
+				childrenLock.release()
+				taxonid = int(child.name)
+				name = ncbi.translate_to_names([taxonid])[0]
+				if name == 'Proteobacteria':
+					results.append((child, current_kmers))
+					with counterLock2:
+						still_working2 -= 1
+				else:
+					edited_name = name.replace(' ', '_').replace('/', '_')
+					bv_filename = edited_name + '.bv'
+					print('Loading ' + name)
+					sys.stdout.flush()
+					child.bf = bf_from_bvfilename(bv_filename) #load bloom filter from bitvector
+					print(name + ' loaded')
+					sys.stdout.flush()
+					kmer_matches = []
+					for kmer in current_kmers: #figure out how many kmers of query match the current bloom filter
+						if child.bf.contains(kmer):
+							kmer_matches.append(kmer)
+					delattr(child, 'bf') #remove bloom filter from memory
+					if len(kmer_matches) > threshold: # if number of kmers that match exceeds threshold, add this child and matching kmers to the work queue
+						results.append((child, kmer_matches))
+					with counterLock2:
+						still_working2 -= 1
+			else:
+				with counterLock2:
+					still_working2 -= 1
+				childrenLock.release()
 	return
 
 def get_next_node_kmers(children, current_kmers, threshold):
