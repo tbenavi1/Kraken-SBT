@@ -200,30 +200,59 @@ def get_query_kmers(query, taxonid_to_readfilenames):
 				break
 	return querykmers
 
-def get_kmer_matches(child, current_kmers, threshold):
-	ncbi = NCBITaxa()
-	taxonid = int(child.name)
-	name = ncbi.translate_to_names([taxonid])[0]
-	if name == 'Proteobacteria':
-		return (child, current_kmers)
-	edited_name = name.replace(' ', '_').replace('/', '_')
-	bv_filename = edited_name + '.bv'
-	print('Loading ' + name)
-	sys.stdout.flush()
-	child.bf = bf_from_bvfilename(bv_filename) #load bloom filter from bitvector
-	print(name + ' loaded')
-	sys.stdout.flush()
-	kmer_matches = []
-	for kmer in current_kmers: #figure out how many kmers of query match the current bloom filter
-		if child.bf.contains(kmer):
-			kmer_matches.append(kmer)
-	delattr(child, 'bf') #remove bloom filter from memory
-	if len(kmer_matches) > threshold: # if number of kmers that match exceeds threshold, add this child and matching kmers to the work queue
-		return (child, kmer_matches)
+def get_kmer_matches(childrenQueue, childrenLock, counterLock2, still_working2, results):
+	while not (still_working2 == 0 and childrenQueue.empty()):
+		ncbi = NCBITaxa()
+		with childrenLock:
+			if not childrenQueue.empty():
+				child, current_kmers, threshold = childrenQueue.get()
+				with counterLock2:
+					still_working2 += 1
+		taxonid = int(child.name)
+		name = ncbi.translate_to_names([taxonid])[0]
+		if name == 'Proteobacteria':
+			results.append((child, current_kmers))
+			with counterLock2:
+				still_working2 -= 1
+		else:
+			edited_name = name.replace(' ', '_').replace('/', '_')
+			bv_filename = edited_name + '.bv'
+			print('Loading ' + name)
+			sys.stdout.flush()
+			child.bf = bf_from_bvfilename(bv_filename) #load bloom filter from bitvector
+			print(name + ' loaded')
+			sys.stdout.flush()
+			kmer_matches = []
+			for kmer in current_kmers: #figure out how many kmers of query match the current bloom filter
+				if child.bf.contains(kmer):
+					kmer_matches.append(kmer)
+			delattr(child, 'bf') #remove bloom filter from memory
+			if len(kmer_matches) > threshold: # if number of kmers that match exceeds threshold, add this child and matching kmers to the work queue
+				results.append((child, kmer_matches))
+			with counterLock2:
+				stil_working2 -= 1
+	return
 
 def get_next_node_kmers(children, current_kmers, threshold):
-	with Pool() as p: #a multiprocessing pool over the children
-		results = [item for item in p.starmap(get_kmer_matches, [(child, current_kmers, threshold) for child in children]) if item is not None]
+	results = []
+	childrenQueue = queue.Queue()
+	childrenLock = threading.Lock()
+	for child in children:
+		childrenQueue.put((child, current_kmers, threshold))
+	
+	counterLock2 = threading.Lock()
+	still_working2 = 0
+	
+	num_threads = 5
+	threads = []
+	for _ in range(num_threads):
+		thread = threading.Thread(target = get_kmer_matches, args = (childrenQueue, childrenLock, counterLock2, still_working2, results))
+		thread.start()
+		threads.append(thread)
+	
+	for t in threads:
+		t.join()
+	
 	return results
 
 def analyze_node(q, queried, queueLock, workQueue, threshold, num_kmers, responses, still_working, counterLock, queriedLock): #each thread targets this function to analyze its current node
