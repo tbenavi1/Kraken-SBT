@@ -233,8 +233,6 @@ def get_kmer_matches(childrenQueue, childrenLock, counterLock2, still_working2, 
 				with counterLock2:
 					still_working2 -= 1
 		else:
-			with counterLock2:
-				still_working2 -= 1
 			childrenLock.release()
 	return
 
