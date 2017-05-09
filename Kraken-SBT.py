@@ -230,7 +230,7 @@ def get_kmer_matches(childrenQueue, childrenLock, counterLock2, still_working2, 
 			if len(kmer_matches) > threshold: # if number of kmers that match exceeds threshold, add this child and matching kmers to the work queue
 				results.append((child, kmer_matches))
 			with counterLock2:
-				stil_working2 -= 1
+				still_working2 -= 1
 	return
 
 def get_next_node_kmers(children, current_kmers, threshold):
