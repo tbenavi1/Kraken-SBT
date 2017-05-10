@@ -82,8 +82,11 @@ def bf_from_bvfilename(bv_filename):
 	return bf
 
 def get_tree(taxonids, num_taxonids = 0):
+	ncbi = NCBITaxa()
+	
 	if num_taxonids != 0:
 		taxonids = taxonids[:num_taxonids] #smaller set of taxonids for tree construction and testing
+	
 	return ncbi.get_topology(taxonids) #5,360 total nodes for full dataset
 
 def write_descendantfiles(tree): #EDIT SO DOESNT USE NCBI
