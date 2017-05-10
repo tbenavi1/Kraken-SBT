@@ -62,8 +62,6 @@ def get_taxonid_to_readfilenames(name_ftpdirpaths_filename): #searches through a
 				print(name, 'is not in the NCBI database')
 	return taxonid_to_readfilenames
 
-
-
 def get_taxonid_to_name(tree):
 	ncbi = NCBITaxa()
 	taxonid_to_name = {}
@@ -172,7 +170,6 @@ def construct_bloomfilter(bloomfiltersizes, num_nodes, nodesQueue, nodes_stop_ev
 				print('Bloom filter for', name, 'constructed.')
 				delattr(node, 'bf') #remove bloomfilter from memory
 				nodesQueue.task_done()
-	return
 
 def construct_bloomfilters(tree, bloomfiltersizes, taxonid_to_name):
 	num_nodes = len(list(tree.get_descendants()))
@@ -220,7 +217,7 @@ def get_query_kmers(query, taxonid_to_readfilenames, taxonid_to_name):
 				break
 	return querykmers
 
-def get_kmer_matches(next_node_kmers, childrenQueue, children_stop_event, taxonid_to_name):
+def get_kmer_matches(next_node_kmers, childrenQueue, taxonid_to_name):
 	#ncbi = NCBITaxa()
 	while not children_stop_event.is_set():
 		if not childrenQueue.empty():
@@ -241,7 +238,6 @@ def get_kmer_matches(next_node_kmers, childrenQueue, children_stop_event, taxoni
 			if len(kmer_matches) > threshold: # if number of kmers that match exceeds threshold, add this child and matching kmers to the work queue
 				next_node_kmers.append((child, kmer_matches))
 			childrenQueue.task_done()
-	return
 
 def get_next_node_kmers(children, current_kmers, threshold, taxonid_to_name):
 	next_node_kmers = [] #a list of (node, kmers) tuples
@@ -255,7 +251,7 @@ def get_next_node_kmers(children, current_kmers, threshold, taxonid_to_name):
 	num_threads = 100
 	threads = []
 	for _ in range(num_threads):
-		thread = threading.Thread(target = get_kmer_matches, args = (next_node_kmers, childrenQueue, children_stop_event, taxonid_to_name))
+		thread = threading.Thread(target = get_kmer_matches, args = (next_node_kmers, childrenQueue, taxonid_to_name))
 		thread.start()
 		threads.append(thread)
 	
@@ -267,38 +263,38 @@ def get_next_node_kmers(children, current_kmers, threshold, taxonid_to_name):
 	
 	return next_node_kmers
 
-def analyze_node(name_to_proportion, num_kmers, threshold, workQueue, work_stop_event, queriedQueue, queriedLock, taxonid_to_name): #each thread targets this function to analyze its current node
+def analyze_node(name_to_proportion, num_kmers, threshold, taxonid_to_name): #each thread targets this function to analyze its current node
 	#ncbi = NCBITaxa()
-	while not work_stop_event.is_set():
-		if not workQueue.empty():
-			current_node, current_kmers = workQueue.get()
-			current_taxonid = int(current_node.name)
-			#current_name = ncbi.translate_to_names([current_taxonid])[0]
-			current_name = taxonid_to_name[current_taxonid]
-			print('Current node:', current_name)
-			if current_node.is_leaf():
+	while True:
+		current_node, current_kmers = workQueue.get()
+		if current_node is None:
+			break
+		current_taxonid = int(current_node.name)
+		#current_name = ncbi.translate_to_names([current_taxonid])[0]
+		current_name = taxonid_to_name[current_taxonid]
+		print('Current node:', current_name)
+		if current_node.is_leaf():
+			proportion = len(current_kmers)/num_kmers
+			name_to_proportion[current_name] = proportion
+			print('Proportion of query kmers matching', current_name + ':', proportion)
+			workQueue.task_done()
+		else:
+			children = current_node.children
+			next_node_kmers = get_next_node_kmers(children, current_kmers, threshold, taxonid_to_name)
+			with queriedLock:
+				num_queried = queriedQueue.get()
+				num_queried += len(children)
+				queriedQueue.put(num_queried)
+			if next_node_kmers == []:
 				proportion = len(current_kmers)/num_kmers
 				name_to_proportion[current_name] = proportion
 				print('Proportion of query kmers matching', current_name + ':', proportion)
 				workQueue.task_done()
 			else:
-				children = current_node.children
-				next_node_kmers = get_next_node_kmers(children, current_kmers, threshold, taxonid_to_name)
-				with queriedLock:
-					num_queried = queriedQueue.get()
-					num_queried += len(children)
-					queriedQueue.put(num_queried)
-				if next_node_kmers == []:
-					proportion = len(current_kmers)/num_kmers
-					name_to_proportion[current_name] = proportion
-					print('Proportion of query kmers matching', current_name + ':', proportion)
-					workQueue.task_done()
-				else:
-					for (child, kmer_matches) in next_node_kmers:
-						workQueue.put((child, kmer_matches))
-						print('Added to queue.')
-					workQueue.task_done()
-	return
+				for (child, kmer_matches) in next_node_kmers:
+					workQueue.put((child, kmer_matches))
+					print('Added to queue.')
+				workQueue.task_done()
 
 #query the tree
 def query_tree(taxonid_to_readfilenames, taxonid_to_name, tree, query, threshold_proportion):
@@ -316,7 +312,6 @@ def query_tree(taxonid_to_readfilenames, taxonid_to_name, tree, query, threshold
 	
 	#create and initialize the queues, lock, and stop event
 	workQueue = queue.Queue() #this "work" queue contains all the nodes and corresponding matching kmers for each query path down the tree
-	work_stop_event = threading.Event()
 	
 	workQueue.put((tree,querykmers)) #'tree' corresponds to the root node of the tree
 	
@@ -328,21 +323,22 @@ def query_tree(taxonid_to_readfilenames, taxonid_to_name, tree, query, threshold
 	num_threads = 100
 	threads = []
 	for _ in range(num_threads):
-		thread = threading.Thread(target = analyze_node, args = (name_to_proportion, num_kmers, threshold, workQueue, work_stop_event, queriedQueue, queriedLock, taxonid_to_name))
+		thread = threading.Thread(target = analyze_node, args = (name_to_proportion, num_kmers, threshold, taxonid_to_name))
 		thread.start()
 		threads.append(thread)
 	
 	#Wait for the queue to be complete, then trigger event to stop threads
 	workQueue.join()
-	work_stop_event.set()
 	
 	#wait for all threads to complete
+	for i in range(num_threads):
+		workQueue.put((None,None))
 	for t in threads:
 		t.join()
 	
 	num_queried = queried.get()
 	print(num_queried, 'nodes queried out of', num_nodes)
-	return sorted(responses.items(), key = operator.itemgetter(1), reverse = True)
+	return sorted(name_to_proportion.items(), key = operator.itemgetter(1), reverse = True)
 
 if __name__=="__main__":
 	
