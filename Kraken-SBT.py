@@ -53,7 +53,6 @@ def get_taxonid_to_readfilenames(name_ftpdirpaths_filename): #searches through a
 		else:
 			if name == 'Donghicola sp. JLT3646': #upon further inspection, this name in assembly_summary.txt has been updated in NCBI
 				print('Changing ' + name + ' to Marivivens sp. JLT3646')
-				sys.stdout.flush()
 				name = 'Marivivens sp. JLT3646'
 				name_to_taxonid = ncbi.get_name_translator([name])
 				listtaxonid = [taxonid for [taxonid] in name_to_taxonid.values()]
@@ -61,7 +60,6 @@ def get_taxonid_to_readfilenames(name_ftpdirpaths_filename): #searches through a
 				taxonid_to_readfilenames[taxonid].append(readfilename)
 			if name == 'Mycobacterium intracellulare MOTT-64': #upon further inspection, this name in assembly_summary.txt is curiously absent from NCBI
 				print(name+' is not in the NCBI database')
-				sys.stdout.flush()
 	return taxonid_to_readfilenames
 
 def bf_from_bvfilename(bv_filename):
@@ -72,9 +70,8 @@ def bf_from_bvfilename(bv_filename):
 	bf = BloomFilter(bitvector.length(), 3, bitvector) #create bloom filter with num_hashes = 3
 	return bf
 
-def get_tree(name_ftpdirpaths_filename,num_taxonids = 0):
+def get_tree(taxonid_to_readfilenames,num_taxonids = 0):
 	ncbi = NCBITaxa()
-	taxonid_to_readfilenames = get_taxonid_to_readfilenames(name_ftpdirpaths_filename)
 	
 	#get the desired number of unique taxonids, in order to create the phylogeny tree
 	taxonids = taxonid_to_readfilenames.keys() #length is 6,740 as expected (6,741 minus the one not in NCBI)
@@ -83,18 +80,16 @@ def get_tree(name_ftpdirpaths_filename,num_taxonids = 0):
 		taxonids = taxonids[:num_taxonids] #smaller set of taxonids for tree construction and testing
 	
 	#return desired phylogeny tree
-	return taxonid_to_readfilenames, ncbi.get_topology(taxonids) #5,360 total nodes for full dataset
+	return ncbi.get_topology(taxonids) #5,360 total nodes for full dataset
 
 def write_descendantfiles(tree):
 	ncbi = NCBITaxa()
-	i=0
-	numnodes = len(list(tree.traverse()))
-	for node in tree.traverse():
+	num_nodes = len(list(tree.traverse()))
+	for i, node in enumerate(tree.traverse()):
 		i+=1
 		taxonid = int(node.name)
 		name = ncbi.translate_to_names([taxonid])[0]
-		print('Node ' + str(i) + ' out of ' + str(numnodes) + ': ' + name)
-		sys.stdout.flush()
+		print('Node ' + str(i) + ' out of ' + str(num_nodes) + ': ' + name)
 		edited_name = name.replace(' ', '_').replace('/', '_')  #replace spaces and / with underscores so that it can be a filename, e.g. Acinetobacter calcoaceticus/baumannii complex
 		f = open("editednames", 'a')
 		f.write(edited_name + '\n')
@@ -106,8 +101,7 @@ def write_descendantfiles(tree):
 			j = 0
 			for readfilename in readfilenames:
 				j+= 1
-				print('Node ' + str(i) + ' out of ' + str(numnodes) + ': ' + name + '; File ' + str(j) + ' out of ' + str(numfiles))
-				sys.stdout.flush()
+				print('Node ' + str(i) + ' out of ' + str(num_nodes) + ': ' + name + '; File ' + str(j) + ' out of ' + str(numfiles))
 				f = open(descendantfilenames_filename,'a')
 				f.write(readfilename + '\n')
 				f.close()
@@ -118,15 +112,13 @@ def write_descendantfiles(tree):
 				k += 1
 				descendant_taxonid = int(descendant.name)
 				descendant_name = ncbi.translate_to_names([descendant_taxonid])[0]
-				print('Node ' + str(i) + ' out of ' + str(numnodes) + ': ' + name + '; Descendant Node ' + str(k) + ' out of ' + str(num_descendants) + ': ' + descendant_name)
-				sys.stdout.flush()
+				print('Node ' + str(i) + ' out of ' + str(num_nodes) + ': ' + name + '; Descendant Node ' + str(k) + ' out of ' + str(num_descendants) + ': ' + descendant_name)
 				descendant_filenames = taxonid_to_readfilenames[descendant_taxonid]
 				descendant_numfiles = len(descendant_filenames)
 				l = 0
 				for descendant_filename in descendant_filenames:
 					l+= 1
-					print('Node ' + str(i) + ' out of ' + str(numnodes) + ': ' + name + '; Descendant Node ' + str(k) + ' out of ' + str(num_descendants) + ': ' + descendant_name + '; Descendant File ' + str(l) + ' out of ' + str(descendant_numfiles))
-					sys.stdout.flush()
+					print('Node ' + str(i) + ' out of ' + str(num_nodes) + ': ' + name + '; Descendant Node ' + str(k) + ' out of ' + str(num_descendants) + ': ' + descendant_name + '; Descendant File ' + str(l) + ' out of ' + str(descendant_numfiles))
 					f = open(descendantfilenames_filename,'a')
 					f.write(descendant_filename + '\n')
 					f.close()
@@ -137,41 +129,63 @@ def read_bloomfiltersizes(bloomfiltersizes_filename): #The bloomfiltersizes file
 		edited_name, size = line.strip().split(' ')
 		bloomfiltersizes[edited_name] = int(size)
 	return bloomfiltersizes
-	
-def construct_bloomfilters(tree, bloomfiltersizes):
+
+def construct_bloomfilter(bloomfiltersizes, num_nodes, nodesQueue, nodes_stop_event):
 	ncbi = NCBITaxa()
-	i=0
-	numnodes = len(list(tree.get_descendants()))
-	for node in tree.get_descendants(): #don't need to get a bloom filter for the root node 'Bacteria'
-		i+=1
+	while not nodes_stop_event.is_set():
+		node, i = nodesQueue.get()
 		taxonid = int(node.name)
 		name = ncbi.translate_to_names([taxonid])[0]
-		print('Node ' + str(i) + ' out of ' + str(numnodes) + ': ' + name)
-		sys.stdout.flush()
+		print('Constructing bloom filter for node ' + str(i) + ' out of ' + str(num_nodes) + ': ' + name)
 		edited_name = name.replace(' ', '_').replace('/', '_')
 		#descendantfilenames_filename = edited_name + '.descendantfilenames'
 		descendantfilenames_filename = edited_name + '.readfiles'
 		bv_filename = edited_name + '.bv'
 		if os.path.exists(bv_filename):
 			print(bv_filename + ' already exists.')
-			sys.stdout.flush()
+			nodesQueue.task_done()
 		else:
 			size = bloomfiltersizes[edited_name] #the size was determined by counting unique kmers using kmc kmer counter
 			size = int(round(size * 4.25,-3)) #multiply by 4.25; round to nearest 1000 (for a 13% false positive rate; bitvector length must be a multiple of 8)
 			node.bf = BloomFilter(size, num_hashes = 3) #num_hashes = 3 (for a 13% positive rate)
-			j = 0
-			for line in open(descendantfilenames_filename): #this for loop and the for loop below add all the kmers from all the descendant node files to the bloom filter
-				j += 1
-				#descendant_filename = line.strip()
-				descendant_filename = line.strip() + '.dumps'
-				print('Reading file ' + str(j))
-				for line2 in open(descendant_filename):
-					kmer = line2.strip().split(' ')[0]
-					node.bf.add(kmer)
+			with open(descendantfilenames_filename) as f:
+				num_files = sum(1 for _ in f)
+				for j, line in enumerate(f): #this for loop and the for loop below add all the kmers from all the descendant node files to the bloom filter
+					#descendant_filename = line.strip()
+					descendant_filename = line.strip() + '.dumps'
+					print('Reading file ' + str(j) + ' out of ' + str(num_files) + ': ' + name)
+					for line2 in open(descendant_filename):
+						kmer = line2.strip().split(' ')[0]
+						node.bf.add(kmer)
 			f = open(bv_filename, 'wb') #open bitvector file for writing
 			node.bf.bv.tofile(f) #write bitvector to file
 			f.close()
+			print('Bloom filter for ' + name + ' constructed.')
 			delattr(node, 'bf') #remove bloomfilter from memory
+			nodesQueue.task_done()
+	return
+
+def construct_bloomfilters(tree, bloomfiltersizes):
+	num_nodes = len(list(tree.get_descendants()))
+	
+	nodesQueue = queue.Queue()
+	nodes_stop_event = threading.Event()
+	
+	for i, node in enumerate(tree.get_descendants()): #don't need to get a bloom filter for the root node 'Bacteria'
+		nodesQueue.put((i,node))
+	
+	num_threads = 10
+	threads = []
+	for _ in range(num_threads):
+		thread = threading.Thread(target = construct_bloomfilter, args = (bloomfiltersizes, num_nodes, nodesQueue, nodes_stop_event))
+		thread.start()
+		threads.append(thread)
+	
+	nodesQueue.join()
+	nodes_stop_event.set()
+	
+	for t in threads:
+		t.join()
 
 def get_query_kmers(query, taxonid_to_readfilenames):
 	ncbi = NCBITaxa()
@@ -180,7 +194,6 @@ def get_query_kmers(query, taxonid_to_readfilenames):
 		querytaxonid = int(query)
 		queryname = ncbi.translate_to_names([querytaxonid])[0]
 		print('Query name is ' + queryname)
-		sys.stdout.flush()
 		queryreadfilenames = taxonid_to_readfilenames[querytaxonid]
 		for queryreadfilename in queryreadfilenames:
 			querydumpsfilename = queryreadfilename + '.dumps'
@@ -190,7 +203,6 @@ def get_query_kmers(query, taxonid_to_readfilenames):
 	except: #if the query is a filename
 		queryfilename = query
 		print('Query filename is ' + queryfilename)
-		sys.stdout.flush()
 		i = 0
 		for line in open(queryfilename):
 			i += 1
@@ -201,8 +213,8 @@ def get_query_kmers(query, taxonid_to_readfilenames):
 	return querykmers
 
 def get_kmer_matches(childrenQueue, childrenLock, counterLock2, still_working2, results):
+	ncbi = NCBITaxa()
 	while not (still_working2 == 0 and childrenQueue.empty()):
-		ncbi = NCBITaxa()
 		childrenLock.acquire()
 		if not childrenQueue.empty():
 			child, current_kmers, threshold = childrenQueue.get()
@@ -219,10 +231,8 @@ def get_kmer_matches(childrenQueue, childrenLock, counterLock2, still_working2, 
 				edited_name = name.replace(' ', '_').replace('/', '_')
 				bv_filename = edited_name + '.bv'
 				print('Loading ' + name)
-				sys.stdout.flush()
 				child.bf = bf_from_bvfilename(bv_filename) #load bloom filter from bitvector
 				print(name + ' loaded')
-				sys.stdout.flush()
 				kmer_matches = []
 				for kmer in current_kmers: #figure out how many kmers of query match the current bloom filter
 					if child.bf.contains(kmer):
@@ -280,7 +290,6 @@ def analyze_node(q, queried, queueLock, workQueue, threshold, num_kmers, respons
 			elif current_node.is_leaf():
 				responses[current_name] = len(current_kmers)/num_kmers
 				print('Proportion of query kmers matching ' + current_name + ': ' + str(len(current_kmers)/num_kmers))
-				sys.stdout.flush()
 				with counterLock:
 					still_working -= 1
 			else:
@@ -293,7 +302,6 @@ def analyze_node(q, queried, queueLock, workQueue, threshold, num_kmers, respons
 				if node_kmers == []:
 					responses[current_name] = len(current_kmers)/num_kmers
 					print('Proportion of query kmers matching ' + current_name + ': ' + str(len(current_kmers)/num_kmers))
-					sys.stdout.flush()
 					with counterLock:
 						still_working -= 1
 				else:
@@ -322,7 +330,7 @@ def query_tree(tree, query, threshold, taxonid_to_readfilenames):
 	responses = {}
 	
 	#get the total number of nodes in the tree
-	numnodes = len(list(tree.traverse()))
+	num_nodes = len(list(tree.traverse()))
 	
 	#create and initialize the queue and locks
 	workQueue = queue.Queue() #this "work" queue contains all the nodes and corresponding matching kmers for each query path down the tree
@@ -333,8 +341,9 @@ def query_tree(tree, query, threshold, taxonid_to_readfilenames):
 	queriedLock = threading.Lock()
 	queried.put(0)
 	
-	counterLock = threading.Lock()
-	still_working = 0 #this variable counts how many of the threads are currently doing work
+	#counterLock = threading.Lock()
+	#still_working = 0 #this variable counts how many of the threads are currently doing work
+	stop_event = threading.Event()
 	
 	#create new threads
 	num_threads = 5
@@ -349,7 +358,7 @@ def query_tree(tree, query, threshold, taxonid_to_readfilenames):
 		t.join()
 	
 	num_queried = queried.get()
-	print(str(num_queried) + ' nodes queried out of ' + str(numnodes))
+	print(str(num_queried) + ' nodes queried out of ' + str(num_nodes))
 	return sorted(responses.items(), key = operator.itemgetter(1), reverse = True)
 
 if __name__=="__main__":
@@ -359,7 +368,8 @@ if __name__=="__main__":
 	num_taxonids = int(sys.argv[2])
 	
 	if command:
-		taxonid_to_readfilenames, tree = get_tree('name_ftpdirpaths', num_taxonids)
+		taxonid_to_readfilenames = get_taxonid_to_readfilenames('name_ftpdirpaths')
+		tree = get_tree(taxonid_to_readfilenames, num_taxonids)
 		num_nodes = len(list(tree.traverse()))
 		print('Tree has ' + str(num_nodes) + ' nodes')
 	
