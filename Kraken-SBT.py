@@ -64,11 +64,12 @@ def get_taxonid_to_readfilenames(name_ftpdirpaths_filename): #searches through a
 
 
 
-def get_taxonid_to_name(taxonids):
+def get_taxonid_to_name(tree):
 	ncbi = NCBITaxa()
 	taxonid_to_name = {}
 	
-	for taxonid in taxonids:
+	for node in tree.traverse():
+		taxonid = int(node.name)
 		taxonid_to_name[taxonid] = ncbi.translate_to_names([taxonid])[0]
 	
 	return taxonid_to_name
@@ -359,11 +360,11 @@ if __name__=="__main__":
 		taxonids = taxonid_to_readfilenames.keys() #length is 6,740 as expected (6,741 minus the one not in NCBI)
 		taxonids = list(set(taxonids)) #4,526 taxonids are unique
 		
-		taxonid_to_name = get_taxonid_to_name(taxonids)
-		
 		tree = get_tree(taxonids, num_taxonids)
 		num_nodes = len(list(tree.traverse()))
 		print('Tree has', num_nodes, 'nodes.')
+		
+		taxonid_to_name = get_taxonid_to_name(tree)
 	
 	if command == "bloomfilters":
 		#construct the bloomfilters (only necessary for the first time building the database)
