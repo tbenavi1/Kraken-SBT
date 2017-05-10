@@ -339,7 +339,7 @@ def query_tree(taxonid_to_readfilenames, taxonid_to_name, tree, query, threshold
 	for t in threads:
 		t.join()
 	
-	num_queried = queried.get()
+	num_queried = queriedQueue.get()
 	print(num_queried, 'nodes queried out of', num_nodes)
 	return sorted(name_to_proportion.items(), key = operator.itemgetter(1), reverse = True)
 
