@@ -173,7 +173,7 @@ def construct_bloomfilter(bloomfiltersizes, num_nodes, nodesQueue, nodes_stop_ev
 				nodesQueue.task_done()
 	return
 
-def construct_bloomfilters(tree, bloomfiltersizes):
+def construct_bloomfilters(tree, bloomfiltersizes, taxonid_to_name):
 	num_nodes = len(list(tree.get_descendants()))
 	
 	nodesQueue = queue.Queue()
@@ -185,7 +185,7 @@ def construct_bloomfilters(tree, bloomfiltersizes):
 	num_threads = 100
 	threads = []
 	for _ in range(num_threads):
-		thread = threading.Thread(target = construct_bloomfilter, args = (bloomfiltersizes, num_nodes, nodesQueue, nodes_stop_event))
+		thread = threading.Thread(target = construct_bloomfilter, args = (bloomfiltersizes, num_nodes, nodesQueue, nodes_stop_event, taxonid_to_name))
 		thread.start()
 		threads.append(thread)
 	
@@ -242,7 +242,7 @@ def get_kmer_matches(next_node_kmers, childrenQueue, children_stop_event, taxoni
 			childrenQueue.task_done()
 	return
 
-def get_next_node_kmers(children, current_kmers, threshold):
+def get_next_node_kmers(children, current_kmers, threshold, taxonid_to_name):
 	next_node_kmers = [] #a list of (node, kmers) tuples
 	
 	childrenQueue = queue.Queue()
@@ -254,7 +254,7 @@ def get_next_node_kmers(children, current_kmers, threshold):
 	num_threads = 100
 	threads = []
 	for _ in range(num_threads):
-		thread = threading.Thread(target = get_kmer_matches, args = (next_node_kmers, childrenQueue, children_stop_event))
+		thread = threading.Thread(target = get_kmer_matches, args = (next_node_kmers, childrenQueue, children_stop_event, taxonid_to_name))
 		thread.start()
 		threads.append(thread)
 	
@@ -282,7 +282,7 @@ def analyze_node(name_to_proportion, num_kmers, threshold, workQueue, work_stop_
 				workQueue.task_done()
 			else:
 				children = current_node.children
-				next_node_kmers = get_next_node_kmers(children, current_kmers, threshold)
+				next_node_kmers = get_next_node_kmers(children, current_kmers, threshold, taxonid_to_name)
 				with queriedLock:
 					num_queried = queriedQueue.get()
 					num_queried += len(children)
@@ -300,12 +300,12 @@ def analyze_node(name_to_proportion, num_kmers, threshold, workQueue, work_stop_
 	return
 
 #query the tree
-def query_tree(tree, query, threshold_proportion, taxonid_to_readfilenames):
+def query_tree(taxonid_to_readfilenames, taxonid_to_name, tree, query, threshold_proportion):
 	
 	name_to_proportion = {} #a dictionary with name as key and the proportion of kmers matching the name as value
 	
 	#get query kmers and threshold
-	querykmers = get_query_kmers(query, taxonid_to_readfilenames)
+	querykmers = get_query_kmers(query, taxonid_to_readfilenames, taxonid_to_name)
 	num_kmers = len(querykmers)
 	print('Number of kmers in query:', num_kmers)
 	threshold = num_kmers * threshold_proportion
@@ -327,7 +327,7 @@ def query_tree(tree, query, threshold_proportion, taxonid_to_readfilenames):
 	num_threads = 100
 	threads = []
 	for _ in range(num_threads):
-		thread = threading.Thread(target = analyze_node, args = (name_to_proportion, num_kmers, threshold, workQueue, work_stop_event, queriedQueue, queriedLock))
+		thread = threading.Thread(target = analyze_node, args = (name_to_proportion, num_kmers, threshold, workQueue, work_stop_event, queriedQueue, queriedLock, taxonid_to_name))
 		thread.start()
 		threads.append(thread)
 	
@@ -370,10 +370,10 @@ if __name__=="__main__":
 		#actually, the end user never needs to perform this step, since they will download the bloom filters directly
 		#bloomfiltersizes = read_bloomfiltersizes('bloomfiltersizes')
 		bloomfiltersizes = read_bloomfiltersizes('bloomfiltersizes2')
-		construct_bloomfilters(tree, bloomfiltersizes)
+		construct_bloomfilters(tree, bloomfiltersizes, taxonid_to_name)
 	
 	if command == "query":
-		querytaxonid = sys.argv[3]
+		query = sys.argv[3]
 		threshold_proportion = float(sys.argv[4])
-		matches = query_tree(taxonid_to_readfilenames, tree, querytaxonid, threshold_proportion)
+		matches = query_tree(taxonid_to_readfilenames, taxonid_to_name, tree, query, threshold_proportion)
 		print(matches)
