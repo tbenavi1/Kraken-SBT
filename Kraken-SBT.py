@@ -72,15 +72,20 @@ def bf_from_bvfilename(bv_filename):
 
 def get_tree(taxonid_to_readfilenames, num_taxonids = 0):
 	ncbi = NCBITaxa()
+	taxonid_to_name = {}
 	
 	#get the desired number of unique taxonids, in order to create the phylogeny tree
 	taxonids = taxonid_to_readfilenames.keys() #length is 6,740 as expected (6,741 minus the one not in NCBI)
 	taxonids = list(set(taxonids)) #4,526 taxonids are unique
+	
+	for taxonid in taxonids:
+		taxonid_to_name[taxonid] = ncbi.translate_to_names([taxonid])[0]
+	
 	if num_taxonids != 0:
 		taxonids = taxonids[:num_taxonids] #smaller set of taxonids for tree construction and testing
 	
 	#return desired phylogeny tree
-	return ncbi.get_topology(taxonids) #5,360 total nodes for full dataset
+	return taxonid_to_name, ncbi.get_topology(taxonids) #5,360 total nodes for full dataset
 
 def write_descendantfiles(tree):
 	ncbi = NCBITaxa()
@@ -343,7 +348,7 @@ if __name__=="__main__":
 	if command:
 		num_taxonids = int(sys.argv[2])
 		taxonid_to_readfilenames = get_taxonid_to_readfilenames('name_ftpdirpaths')
-		tree = get_tree(taxonid_to_readfilenames, num_taxonids)
+		taxonid_to_name, tree = get_tree(taxonid_to_readfilenames, num_taxonids)
 		num_nodes = len(list(tree.traverse()))
 		print('Tree has', num_nodes, 'nodes.')
 	
