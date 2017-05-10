@@ -62,6 +62,17 @@ def get_taxonid_to_readfilenames(name_ftpdirpaths_filename): #searches through a
 				print(name, 'is not in the NCBI database')
 	return taxonid_to_readfilenames
 
+
+
+def get_taxonid_to_name(taxonids):
+	ncbi = NCBITaxa()
+	taxonid_to_name = {}
+	
+	for taxonid in taxonids:
+		taxonid_to_name[taxonid] = ncbi.translate_to_names([taxonid])[0]
+	
+	return taxonid_to_name
+
 def bf_from_bvfilename(bv_filename):
 	f = open(bv_filename, 'rb') #open file with bitvector
 	bitvector = bitarray() #initalize bitvector
@@ -70,24 +81,12 @@ def bf_from_bvfilename(bv_filename):
 	bf = BloomFilter(bitvector.length(), 3, bitvector) #create bloom filter with num_hashes = 3
 	return bf
 
-def get_tree(taxonid_to_readfilenames, num_taxonids = 0):
-	ncbi = NCBITaxa()
-	taxonid_to_name = {}
-	
-	#get the desired number of unique taxonids, in order to create the phylogeny tree
-	taxonids = taxonid_to_readfilenames.keys() #length is 6,740 as expected (6,741 minus the one not in NCBI)
-	taxonids = list(set(taxonids)) #4,526 taxonids are unique
-	
-	for taxonid in taxonids:
-		taxonid_to_name[taxonid] = ncbi.translate_to_names([taxonid])[0]
-	
+def get_tree(taxonids, num_taxonids = 0):
 	if num_taxonids != 0:
 		taxonids = taxonids[:num_taxonids] #smaller set of taxonids for tree construction and testing
-	
-	#return desired phylogeny tree
-	return taxonid_to_name, ncbi.get_topology(taxonids) #5,360 total nodes for full dataset
+	return ncbi.get_topology(taxonids) #5,360 total nodes for full dataset
 
-def write_descendantfiles(tree):
+def write_descendantfiles(tree): #EDIT SO DOESNT USE NCBI
 	ncbi = NCBITaxa()
 	num_nodes = len(list(tree.traverse()))
 	for i, node in enumerate(tree.traverse()):
@@ -134,13 +133,14 @@ def read_bloomfiltersizes(bloomfiltersizes_filename): #The bloomfiltersizes file
 		bloomfiltersizes[edited_name] = int(size)
 	return bloomfiltersizes
 
-def construct_bloomfilter(bloomfiltersizes, num_nodes, nodesQueue, nodes_stop_event):
-	ncbi = NCBITaxa()
+def construct_bloomfilter(bloomfiltersizes, num_nodes, nodesQueue, nodes_stop_event, taxonid_to_name):
+	#ncbi = NCBITaxa()
 	while not nodes_stop_event.is_set():
 		if not nodesQueue.empty():
 			i, node = nodesQueue.get()
 			taxonid = int(node.name)
-			name = ncbi.translate_to_names([taxonid])[0]
+			#name = ncbi.translate_to_names([taxonid])[0]
+			name = taxonid_to_name[taxonid]
 			print('Constructing bloom filter for node', i+1, 'out of', str(num_nodes) + ':', name)
 			edited_name = name.replace(' ', '_').replace('/', '_')
 			#descendantfilenames_filename = edited_name + '.descendantfilenames'
@@ -192,12 +192,13 @@ def construct_bloomfilters(tree, bloomfiltersizes):
 	for t in threads:
 		t.join()
 
-def get_query_kmers(query, taxonid_to_readfilenames):
-	ncbi = NCBITaxa()
+def get_query_kmers(query, taxonid_to_readfilenames, taxonid_to_name):
+	#ncbi = NCBITaxa()
 	querykmers = []
 	try: #if the query is a taxonid
 		querytaxonid = int(query)
-		queryname = ncbi.translate_to_names([querytaxonid])[0]
+		#queryname = ncbi.translate_to_names([querytaxonid])[0]
+		queryname = taxonid_to_name[querytaxonid]
 		print('Query name is', queryname)
 		queryreadfilenames = taxonid_to_readfilenames[querytaxonid]
 		for queryreadfilename in queryreadfilenames:
@@ -215,13 +216,14 @@ def get_query_kmers(query, taxonid_to_readfilenames):
 				break
 	return querykmers
 
-def get_kmer_matches(next_node_kmers, childrenQueue, children_stop_event):
-	ncbi = NCBITaxa()
+def get_kmer_matches(next_node_kmers, childrenQueue, children_stop_event, taxonid_to_name):
+	#ncbi = NCBITaxa()
 	while not children_stop_event.is_set():
 		if not childrenQueue.empty():
 			child, current_kmers, threshold = childrenQueue.get()
 			taxonid = int(child.name)
-			name = ncbi.translate_to_names([taxonid])[0]
+			#name = ncbi.translate_to_names([taxonid])[0]
+			name = taxonid_to_name[taxonid]
 			edited_name = name.replace(' ', '_').replace('/', '_')
 			bv_filename = edited_name + '.bv'
 			print('Loading', name)
@@ -261,13 +263,14 @@ def get_next_node_kmers(children, current_kmers, threshold):
 	
 	return next_node_kmers
 
-def analyze_node(name_to_proportion, num_kmers, threshold, workQueue, work_stop_event, queriedQueue, queriedLock): #each thread targets this function to analyze its current node
-	ncbi = NCBITaxa()
+def analyze_node(name_to_proportion, num_kmers, threshold, workQueue, work_stop_event, queriedQueue, queriedLock, taxonid_to_name): #each thread targets this function to analyze its current node
+	#ncbi = NCBITaxa()
 	while not work_stop_event.is_set():
 		if not workQueue.empty():
 			current_node, current_kmers = workQueue.get()
 			current_taxonid = int(current_node.name)
-			current_name = ncbi.translate_to_names([current_taxonid])[0]
+			#current_name = ncbi.translate_to_names([current_taxonid])[0]
+			current_name = taxonid_to_name[current_taxonid]
 			print('Current node:', current_name)
 			if current_node.is_leaf():
 				proportion = len(current_kmers)/num_kmers
@@ -348,7 +351,14 @@ if __name__=="__main__":
 	if command:
 		num_taxonids = int(sys.argv[2])
 		taxonid_to_readfilenames = get_taxonid_to_readfilenames('name_ftpdirpaths')
-		taxonid_to_name, tree = get_tree(taxonid_to_readfilenames, num_taxonids)
+		
+		#get the unique taxonids, in order to create the phylogeny tree
+		taxonids = taxonid_to_readfilenames.keys() #length is 6,740 as expected (6,741 minus the one not in NCBI)
+		taxonids = list(set(taxonids)) #4,526 taxonids are unique
+		
+		taxonid_to_name = get_taxonid_to_name(taxonids)
+		
+		tree = get_tree(taxonids, num_taxonids)
 		num_nodes = len(list(tree.traverse()))
 		print('Tree has', num_nodes, 'nodes.')
 	
