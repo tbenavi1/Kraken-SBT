@@ -70,7 +70,7 @@ def bf_from_bvfilename(bv_filename):
 	bf = BloomFilter(bitvector.length(), 3, bitvector) #create bloom filter with num_hashes = 3
 	return bf
 
-def get_tree(num_taxonids = 0, taxonid_to_readfilenames):
+def get_tree(taxonid_to_readfilenames, num_taxonids = 0):
 	ncbi = NCBITaxa()
 	
 	#get the desired number of unique taxonids, in order to create the phylogeny tree
@@ -343,7 +343,7 @@ if __name__=="__main__":
 	if command:
 		num_taxonids = int(sys.argv[2])
 		taxonid_to_readfilenames = get_taxonid_to_readfilenames('name_ftpdirpaths')
-		tree = get_tree(num_taxonids, taxonid_to_readfilenames)
+		tree = get_tree(taxonid_to_readfilenames, num_taxonids)
 		num_nodes = len(list(tree.traverse()))
 		print('Tree has', num_nodes, 'nodes.')
 	
