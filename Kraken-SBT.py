@@ -310,7 +310,7 @@ def query_tree(tree, query, threshold_proportion, taxonid_to_readfilenames):
 	
 	queriedQueue = queue.Queue() #this queue counts how many nodes have been visited during the querying process
 	queriedLock = threading.Lock()
-	queried.put(0)
+	queriedQueue.put(0)
 	
 	#create new threads
 	num_threads = 100
