@@ -219,31 +219,31 @@ def get_query_kmers(query, taxonid_to_readfilenames, taxonid_to_name):
 
 def get_kmer_matches(next_node_kmers, childrenQueue, taxonid_to_name):
 	#ncbi = NCBITaxa()
-	while not children_stop_event.is_set():
-		if not childrenQueue.empty():
-			child, current_kmers, threshold = childrenQueue.get()
-			taxonid = int(child.name)
-			#name = ncbi.translate_to_names([taxonid])[0]
-			name = taxonid_to_name[taxonid]
-			edited_name = name.replace(' ', '_').replace('/', '_')
-			bv_filename = edited_name + '.bv'
-			print('Loading', name)
-			child.bf = bf_from_bvfilename(bv_filename) #load bloom filter from bitvector
-			print(name, 'loaded')
-			kmer_matches = []
-			for kmer in current_kmers: #figure out how many kmers of query match the current bloom filter
-				if child.bf.contains(kmer):
-					kmer_matches.append(kmer)
-			delattr(child, 'bf') #remove bloom filter from memory
-			if len(kmer_matches) > threshold: # if number of kmers that match exceeds threshold, add this child and matching kmers to the work queue
-				next_node_kmers.append((child, kmer_matches))
-			childrenQueue.task_done()
+	while True:
+		child, current_kmers, threshold = childrenQueue.get()
+		if child is None:
+			break
+		taxonid = int(child.name)
+		#name = ncbi.translate_to_names([taxonid])[0]
+		name = taxonid_to_name[taxonid]
+		edited_name = name.replace(' ', '_').replace('/', '_')
+		bv_filename = edited_name + '.bv'
+		print('Loading', name)
+		child.bf = bf_from_bvfilename(bv_filename) #load bloom filter from bitvector
+		print(name, 'loaded')
+		kmer_matches = []
+		for kmer in current_kmers: #figure out how many kmers of query match the current bloom filter
+			if child.bf.contains(kmer):
+				kmer_matches.append(kmer)
+		delattr(child, 'bf') #remove bloom filter from memory
+		if len(kmer_matches) > threshold: # if number of kmers that match exceeds threshold, add this child and matching kmers to the work queue
+			next_node_kmers.append((child, kmer_matches))
+		childrenQueue.task_done()
 
 def get_next_node_kmers(children, current_kmers, threshold, taxonid_to_name):
 	next_node_kmers = [] #a list of (node, kmers) tuples
 	
 	childrenQueue = queue.Queue()
-	children_stop_event = threading.Event()
 	
 	for child in children:
 		childrenQueue.put((child, current_kmers, threshold))
@@ -255,9 +255,12 @@ def get_next_node_kmers(children, current_kmers, threshold, taxonid_to_name):
 		thread.start()
 		threads.append(thread)
 	
+	#wait for the queue to be complete, then trigger event to stop threads
 	childrenQueue.join()
-	children_stop_event.set()
 	
+	#wait for all threads to complete
+	for i in range(num_threads):
+		childrenQueue.put((None, None, None))
 	for t in threads:
 		t.join()
 	
@@ -327,12 +330,12 @@ def query_tree(taxonid_to_readfilenames, taxonid_to_name, tree, query, threshold
 		thread.start()
 		threads.append(thread)
 	
-	#Wait for the queue to be complete, then trigger event to stop threads
+	#wait for the queue to be complete, then trigger event to stop threads
 	workQueue.join()
 	
 	#wait for all threads to complete
 	for i in range(num_threads):
-		workQueue.put((None,None))
+		workQueue.put((None, None))
 	for t in threads:
 		t.join()
 	
