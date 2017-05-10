@@ -149,13 +149,13 @@ def construct_bloomfilter(bloomfiltersizes, num_nodes, nodesQueue, nodes_stop_ev
 			node.bf = BloomFilter(size, num_hashes = 3) #num_hashes = 3 (for a 13% positive rate)
 			with open(descendantfilenames_filename) as f:
 				num_files = sum(1 for _ in f)
-				for j, line in enumerate(f): #this for loop and the for loop below add all the kmers from all the descendant node files to the bloom filter
-					#descendant_filename = line.strip()
-					descendant_filename = line.strip() + '.dumps'
-					print('Reading file ' + str(j) + ' out of ' + str(num_files) + ': ' + name)
-					for line2 in open(descendant_filename):
-						kmer = line2.strip().split(' ')[0]
-						node.bf.add(kmer)
+			for j, line in enumerate(open(descendantfilenames_filename)): #this for loop and the for loop below add all the kmers from all the descendant node files to the bloom filter
+				#descendant_filename = line.strip()
+				descendant_filename = line.strip() + '.dumps'
+				print('Reading file ' + str(j) + ' out of ' + str(num_files) + ': ' + name)
+				for line2 in open(descendant_filename):
+					kmer = line2.strip().split(' ')[0]
+					node.bf.add(kmer)
 			f = open(bv_filename, 'wb') #open bitvector file for writing
 			node.bf.bv.tofile(f) #write bitvector to file
 			f.close()
