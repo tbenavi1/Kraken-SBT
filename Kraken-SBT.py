@@ -86,7 +86,6 @@ def write_descendantfiles(tree):
 	ncbi = NCBITaxa()
 	num_nodes = len(list(tree.traverse()))
 	for i, node in enumerate(tree.traverse()):
-		i+=1
 		taxonid = int(node.name)
 		name = ncbi.translate_to_names([taxonid])[0]
 		print('Node ' + str(i) + ' out of ' + str(num_nodes) + ': ' + name)
@@ -133,7 +132,7 @@ def read_bloomfiltersizes(bloomfiltersizes_filename): #The bloomfiltersizes file
 def construct_bloomfilter(bloomfiltersizes, num_nodes, nodesQueue, nodes_stop_event):
 	ncbi = NCBITaxa()
 	while not nodes_stop_event.is_set():
-		node, i = nodesQueue.get()
+		i, node = nodesQueue.get()
 		taxonid = int(node.name)
 		name = ncbi.translate_to_names([taxonid])[0]
 		print('Constructing bloom filter for node ' + str(i) + ' out of ' + str(num_nodes) + ': ' + name)
