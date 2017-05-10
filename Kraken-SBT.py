@@ -263,7 +263,7 @@ def get_next_node_kmers(children, current_kmers, threshold, taxonid_to_name):
 	
 	return next_node_kmers
 
-def analyze_node(name_to_proportion, num_kmers, threshold, taxonid_to_name): #each thread targets this function to analyze its current node
+def analyze_node(name_to_proportion, num_kmers, threshold, taxonid_to_name, workQueue, queriedQueue, queriedLock): #each thread targets this function to analyze its current node
 	#ncbi = NCBITaxa()
 	while True:
 		current_node, current_kmers = workQueue.get()
@@ -323,7 +323,7 @@ def query_tree(taxonid_to_readfilenames, taxonid_to_name, tree, query, threshold
 	num_threads = 100
 	threads = []
 	for _ in range(num_threads):
-		thread = threading.Thread(target = analyze_node, args = (name_to_proportion, num_kmers, threshold, taxonid_to_name))
+		thread = threading.Thread(target = analyze_node, args = (name_to_proportion, num_kmers, threshold, taxonid_to_name, workQueue, queriedQueue, queriedLock))
 		thread.start()
 		threads.append(thread)
 	
