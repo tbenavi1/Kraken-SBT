@@ -135,7 +135,7 @@ def construct_bloomfilter(bloomfiltersizes, num_nodes, nodesQueue, nodes_stop_ev
 		i, node = nodesQueue.get()
 		taxonid = int(node.name)
 		name = ncbi.translate_to_names([taxonid])[0]
-		print('Constructing bloom filter for node ' + str(i) + ' out of ' + str(num_nodes) + ': ' + name)
+		print('Constructing bloom filter for node ' + str(i+1) + ' out of ' + str(num_nodes) + ': ' + name)
 		edited_name = name.replace(' ', '_').replace('/', '_')
 		#descendantfilenames_filename = edited_name + '.descendantfilenames'
 		descendantfilenames_filename = edited_name + '.readfiles'
@@ -149,12 +149,12 @@ def construct_bloomfilter(bloomfiltersizes, num_nodes, nodesQueue, nodes_stop_ev
 			node.bf = BloomFilter(size, num_hashes = 3) #num_hashes = 3 (for a 13% positive rate)
 			with open(descendantfilenames_filename) as f:
 				num_files = sum(1 for _ in f)
-			for j, line in enumerate(open(descendantfilenames_filename)): #this for loop and the for loop below add all the kmers from all the descendant node files to the bloom filter
-				#descendant_filename = line.strip()
-				descendant_filename = line.strip() + '.dumps'
-				print('Reading file ' + str(j) + ' out of ' + str(num_files) + ': ' + name)
-				for line2 in open(descendant_filename):
-					kmer = line2.strip().split(' ')[0]
+			for j, descendant_filename in enumerate(open(descendantfilenames_filename)): #this for loop and the for loop below add all the kmers from all the descendant node files to the bloom filter
+				#descendant_filename = descendant_filename.strip()
+				descendant_filename = descendant_filename.strip() + '.dumps'
+				print('Reading file ' + str(j+1) + ' out of ' + str(num_files) + ': ' + name)
+				for line in open(descendant_filename):
+					kmer = line.strip().split(' ')[0]
 					node.bf.add(kmer)
 			f = open(bv_filename, 'wb') #open bitvector file for writing
 			node.bf.bv.tofile(f) #write bitvector to file
@@ -173,7 +173,7 @@ def construct_bloomfilters(tree, bloomfiltersizes):
 	for i, node in enumerate(tree.get_descendants()): #don't need to get a bloom filter for the root node 'Bacteria'
 		nodesQueue.put((i,node))
 	
-	num_threads = 10
+	num_threads = 100
 	threads = []
 	for _ in range(num_threads):
 		thread = threading.Thread(target = construct_bloomfilter, args = (bloomfiltersizes, num_nodes, nodesQueue, nodes_stop_event))
@@ -202,70 +202,58 @@ def get_query_kmers(query, taxonid_to_readfilenames):
 	except: #if the query is a filename
 		queryfilename = query
 		print('Query filename is ' + queryfilename)
-		i = 0
-		for line in open(queryfilename):
-			i += 1
+		for i, line in enumerate(open(queryfilename)):
 			kmer = line.strip().split(' ')[0]
 			querykmers.append(kmer)
 			if i == 100000: #only count a given number of kmers, for testing purposes
 				break
 	return querykmers
 
-def get_kmer_matches(childrenQueue, childrenLock, counterLock2, still_working2, results):
+def get_kmer_matches(next_node_kmers, childrenQueue, children_stop_event):
 	ncbi = NCBITaxa()
-	while not (still_working2 == 0 and childrenQueue.empty()):
-		childrenLock.acquire()
+	while not children_stop_event.is_set():
 		if not childrenQueue.empty():
 			child, current_kmers, threshold = childrenQueue.get()
-			with counterLock2:
-				still_working2 += 1
-			childrenLock.release()
 			taxonid = int(child.name)
 			name = ncbi.translate_to_names([taxonid])[0]
-			if name == 'Proteobacteria':
-				results.append((child, current_kmers))
-				with counterLock2:
-					still_working2 -= 1
-			else:
-				edited_name = name.replace(' ', '_').replace('/', '_')
-				bv_filename = edited_name + '.bv'
-				print('Loading ' + name)
-				child.bf = bf_from_bvfilename(bv_filename) #load bloom filter from bitvector
-				print(name + ' loaded')
-				kmer_matches = []
-				for kmer in current_kmers: #figure out how many kmers of query match the current bloom filter
-					if child.bf.contains(kmer):
-						kmer_matches.append(kmer)
-				delattr(child, 'bf') #remove bloom filter from memory
-				if len(kmer_matches) > threshold: # if number of kmers that match exceeds threshold, add this child and matching kmers to the work queue
-					results.append((child, kmer_matches))
-				with counterLock2:
-					still_working2 -= 1
-		else:
-			childrenLock.release()
+			edited_name = name.replace(' ', '_').replace('/', '_')
+			bv_filename = edited_name + '.bv'
+			print('Loading ' + name)
+			child.bf = bf_from_bvfilename(bv_filename) #load bloom filter from bitvector
+			print(name + ' loaded')
+			kmer_matches = []
+			for kmer in current_kmers: #figure out how many kmers of query match the current bloom filter
+				if child.bf.contains(kmer):
+					kmer_matches.append(kmer)
+			delattr(child, 'bf') #remove bloom filter from memory
+			if len(kmer_matches) > threshold: # if number of kmers that match exceeds threshold, add this child and matching kmers to the work queue
+				next_node_kmers.append((child, kmer_matches))
+			childrenQueue.task_done()
 	return
 
 def get_next_node_kmers(children, current_kmers, threshold):
-	results = []
+	next_node_kmers = [] #a list of (node, kmers) tuples
+	
 	childrenQueue = queue.Queue()
-	childrenLock = threading.Lock()
+	children_stop_event = threading.Event()
+	
 	for child in children:
 		childrenQueue.put((child, current_kmers, threshold))
 	
-	counterLock2 = threading.Lock()
-	still_working2 = 0
-	
-	num_threads = 5
+	num_threads = 100
 	threads = []
 	for _ in range(num_threads):
-		thread = threading.Thread(target = get_kmer_matches, args = (childrenQueue, childrenLock, counterLock2, still_working2, results))
+		thread = threading.Thread(target = get_kmer_matches, args = (next_node_kmers, childrenQueue, children_stop_event))
 		thread.start()
 		threads.append(thread)
+	
+	childrenQueue.join()
+	children_stop_event.set()
 	
 	for t in threads:
 		t.join()
 	
-	return results
+	return next_node_kmers
 
 def analyze_node(q, queried, queueLock, workQueue, threshold, num_kmers, responses, still_working, counterLock, queriedLock): #each thread targets this function to analyze its current node
 	while not (still_working == 0 and workQueue.empty()): #while work is being done or the work queue is not empty
@@ -345,7 +333,7 @@ def query_tree(tree, query, threshold, taxonid_to_readfilenames):
 	stop_event = threading.Event()
 	
 	#create new threads
-	num_threads = 5
+	num_threads = 100
 	threads = []
 	for _ in range(num_threads):
 		thread = threading.Thread(target = analyze_node, args = (workQueue,queried, queueLock, workQueue, threshold, num_kmers, responses, still_working, counterLock, queriedLock))
