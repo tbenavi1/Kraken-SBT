@@ -179,7 +179,7 @@ def construct_bloomfilters(tree, bloomfiltersizes, taxonid_to_name):
 	
 	nodesQueue.join()
 	
-	for i range(num_threads):
+	for i in range(num_threads):
 		nodesQueue.put((None, None))
 	for t in threads:
 		t.join()
