@@ -214,7 +214,7 @@ def bf_from_bvfilename(bv_filename):
 	bf = BloomFilter(bitvector.length(), 3, bitvector) #create bloom filter with num_hashes = 3
 	return bf
 
-def get_kmer_matches(next_node_kmers, childrenQueue, taxonid_to_name, p, threshold_proportion):
+def get_kmer_matches(next_node_kmers, childrenQueue, taxonid_to_name, p, threshold_proportion, num_kmers):
 	f = 0.13 #The false positive rate for the bloom filters
 	while True:
 		child, current_kmers = childrenQueue.get()
@@ -238,7 +238,7 @@ def get_kmer_matches(next_node_kmers, childrenQueue, taxonid_to_name, p, thresho
 			next_node_kmers.append((child, kmer_matches, adjusted_proportion))
 		childrenQueue.task_done()
 
-def get_next_node_kmers(children, current_kmers, threshold_proportion, taxonid_to_name, p):
+def get_next_node_kmers(children, current_kmers, threshold_proportion, num_kmers, taxonid_to_name, p):
 	next_node_kmers = [] #a list of (node, kmers) tuples
 	
 	childrenQueue = queue.Queue()
@@ -249,7 +249,7 @@ def get_next_node_kmers(children, current_kmers, threshold_proportion, taxonid_t
 	num_threads = 100
 	threads = []
 	for _ in range(num_threads):
-		thread = threading.Thread(target = get_kmer_matches, args = (next_node_kmers, childrenQueue, taxonid_to_name, p, threshold_proportion))
+		thread = threading.Thread(target = get_kmer_matches, args = (next_node_kmers, childrenQueue, taxonid_to_name, p, threshold_proportion, num_kmers))
 		thread.start()
 		threads.append(thread)
 	
@@ -282,7 +282,7 @@ def analyze_node(name_to_proportion, num_kmers, threshold_proportion, taxonid_to
 			workQueue.task_done()
 		else:
 			children = current_node.children
-			next_node_kmers = get_next_node_kmers(children, current_kmers, threshold_proportion, taxonid_to_name, p)
+			next_node_kmers = get_next_node_kmers(children, current_kmers, threshold_proportion, num_kmers, taxonid_to_name, p)
 			num_queried = queriedQueue.get()
 			num_queried += len(children)
 			queriedQueue.put(num_queried)
