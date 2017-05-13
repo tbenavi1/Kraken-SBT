@@ -263,7 +263,7 @@ def get_next_node_kmers(children, current_kmers, threshold_proportion, num_kmers
 		q = len(kmer_matches[i])/num_kmers
 		adjusted_proportion = (q - (p*f))/(1-f)
 		if adjusted_proportion >= threshold_proportion:
-			next_node_kmers.append(child, kmer_matches[i], adjusted_proportion)
+			next_node_kmers.append((child, kmer_matches[i], adjusted_proportion))
 	
 	#childrenQueue = queue.Queue()
 	
