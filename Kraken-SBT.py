@@ -254,7 +254,7 @@ def get_next_node_kmers(children, current_kmers, threshold_proportion, num_kmers
 	kmer_matches = [[] for _ in num_children]
 	for j, kmer in enumerate(current_kmers):
 		for i, child in enumerate(children):
-			if child.bf.contains(kmer)
+			if child.bf.contains(kmer):
 				kmer_matches[i].append(kmer)
 		if j % 10000 == 0:
 			print('j:', j)
