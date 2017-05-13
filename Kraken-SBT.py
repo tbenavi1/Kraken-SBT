@@ -251,7 +251,7 @@ def get_next_node_kmers(children, current_kmers, threshold_proportion, num_kmers
 		print('Loading', name)
 		child.bf = bf_from_bvfilename(bv_filename)
 		print(name, 'loaded')
-	kmer_matches = [[] for _ in num_children]
+	kmer_matches = [[] for _ in range(num_children)]
 	for j, kmer in enumerate(current_kmers):
 		for i, child in enumerate(children):
 			if child.bf.contains(kmer):
