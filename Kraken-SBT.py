@@ -241,26 +241,50 @@ def get_kmer_matches(next_node_kmers, childrenQueue, taxonid_to_name, p, thresho
 def get_next_node_kmers(children, current_kmers, threshold_proportion, num_kmers, taxonid_to_name, p):
 	next_node_kmers = [] #a list of (node, kmers) tuples
 	
-	childrenQueue = queue.Queue()
+	f = 0.13
+	num_children = len(children)
+	for i, child in enumerate(children):
+		taxonid = int(child.name)
+		name = taxonid_to_name[taxonid]
+		edited_name = name.replace(' ', '_').replace('/', '_')
+		bv_filename = edited_name + '.bv'
+		print('Loading', name)
+		child.bf = bf_from_bvfilename(bv_filename)
+		print(name, 'loaded')
+	kmer_matches = [[] for _ in num_children]
+	for j, kmer in enumerate(current_kmers):
+		for i, child in enumerate(children):
+			if child.bf.contains(kmer)
+				kmer_matches[i].append(kmer)
+		if j % 10000 == 0:
+			print('j:', j)
+	for i, child in enumerate(children):
+		delattr(child, 'bf')
+		q = len(kmer_matches[i])/num_kmers
+		adjusted_proportion = (q - (p*f))/(1-f)
+		if adjusted_proportion >= threshold_proportion:
+			next_node_kmers.append(child, kmer_matches[i], adjusted_proportion)
 	
-	for child in children:
-		childrenQueue.put((child, current_kmers))
+	#childrenQueue = queue.Queue()
 	
-	num_threads = 100
-	threads = []
-	for _ in range(num_threads):
-		thread = threading.Thread(target = get_kmer_matches, args = (next_node_kmers, childrenQueue, taxonid_to_name, p, threshold_proportion, num_kmers))
-		thread.start()
-		threads.append(thread)
+	#for child in children:
+	#	childrenQueue.put((child, current_kmers))
+	
+	#num_threads = 100
+	#threads = []
+	#for _ in range(num_threads):
+	#	thread = threading.Thread(target = get_kmer_matches, args = (next_node_kmers, childrenQueue, taxonid_to_name, p, threshold_proportion, num_kmers))
+	#	thread.start()
+	#	threads.append(thread)
 	
 	#wait for the queue to be complete, then trigger event to stop threads
-	childrenQueue.join()
+	#childrenQueue.join()
 	
 	#wait for all threads to complete
-	for i in range(num_threads):
-		childrenQueue.put((None, None))
-	for t in threads:
-		t.join()
+	#for i in range(num_threads):
+	#	childrenQueue.put((None, None))
+	#for t in threads:
+	#	t.join()
 	
 	return next_node_kmers
 
