@@ -210,6 +210,7 @@ def get_query_kmers(taxonid_to_readfilenames, taxonid_to_name, query):
 			#querykmersQueue.put(kmer)
 			if i == 100000: #only count a given number of kmers, for testing purposes
 				break
+	return querykmers
 
 def bf_from_bvfilename(bv_filename):
 	f = open(bv_filename, 'rb') #open file with bitvector
@@ -219,7 +220,7 @@ def bf_from_bvfilename(bv_filename):
 	bf = BloomFilter(bitvector.length(), 3, bitvector) #create bloom filter with num_hashes = 3
 	return bf
 
-def get_kmer_matches(current_kmers_queue, children, kmer_matches):
+def get_kmer_matches(children, current_kmers_queue, kmer_matches):
 	while True:
 		#child, current_kmers = childrenQueue.get()
 		current_kmer = current_kmers_queue.get()
@@ -260,6 +261,7 @@ def load_bloomfilters(taxonid_to_name, childrenQueue):
 		child.bf = bf_from_bvfilename(bv_filename)
 		print(name, 'loaded')
 		childrenQueue.task_done()
+	childrenQueue.put(child)
 
 def get_next_node_kmers(taxonid_to_name, threshold_proportion, num_kmers, current_kmers, p, children):
 	next_node_kmers = [] #a list of (node, kmers) tuples
@@ -279,6 +281,7 @@ def get_next_node_kmers(taxonid_to_name, threshold_proportion, num_kmers, curren
 		processes.append(process)
 	
 	childrenQueue.join()
+	children = list(childrenQueue.queue)
 	
 	for i in range(num_processes):
 		childrenQueue.put(None)
@@ -291,7 +294,7 @@ def get_next_node_kmers(taxonid_to_name, threshold_proportion, num_kmers, curren
 	
 	processes = []
 	for _ in range(num_processes):
-		process = mp.Process(target = get_kmer_matches, args = (current_kmers_queue, children, kmer_matches))
+		process = mp.Process(target = get_kmer_matches, args = (children, current_kmers_queue, kmer_matches))
 		process.start()
 		processes.append(process)
 	
@@ -385,7 +388,7 @@ def query_tree(taxonid_to_readfilenames, tree, taxonid_to_name, query, threshold
 	
 	#get query kmers and threshold
 	#querykmersQueue = workManager.Queue()
-	get_query_kmers(taxonid_to_readfilenames, taxonid_to_name, query)
+	querykmers = get_query_kmers(taxonid_to_readfilenames, taxonid_to_name, query)
 	num_kmers = len(querykmers)
 	#num_kmers = querykmersQueue.qsize()
 	print('Number of kmers in query:', num_kmers)
