@@ -281,12 +281,13 @@ def get_next_node_kmers(taxonid_to_name, threshold_proportion, num_kmers, curren
 		processes.append(process)
 	
 	childrenQueue.join()
-	children = list(childrenQueue.queue)
+	childrenQueue.put(None)
+	children = [child for child in iter(childrenQueue.get, None)]
 	
 	for i in range(num_processes):
 		childrenQueue.put(None)
-	for p in processes:
-		p.join()
+	for process in processes:
+		process.join()
 	
 	current_kmers_queue = childrenManager.Queue()
 	
@@ -305,8 +306,8 @@ def get_next_node_kmers(taxonid_to_name, threshold_proportion, num_kmers, curren
 	
 	for i in range(num_processes):
 		current_kmers_queue.put(None)
-	for p in processes:
-		p.join()
+	for process in processes:
+		process.join()
 	
 	#for j, kmer in enumerate(current_kmers_queue):
 	#	for i, child in enumerate(children):
@@ -317,7 +318,9 @@ def get_next_node_kmers(taxonid_to_name, threshold_proportion, num_kmers, curren
 	for i, child in enumerate(children):
 		delattr(child, 'bf')
 		q = len(kmer_matches[i])/num_kmers
+		print('q',q)
 		adjusted_proportion = (q - (p*f))/(1-f)
+		print('adjusted', adjusted_proportion)
 		if adjusted_proportion >= threshold_proportion:
 			next_node_kmers.append((child, kmer_matches[i], adjusted_proportion))
 	
