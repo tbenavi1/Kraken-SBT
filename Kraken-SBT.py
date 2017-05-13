@@ -2,7 +2,7 @@ from bitarray import bitarray
 from collections import defaultdict
 from ete3 import NCBITaxa
 #from multiprocessing import Pool
-from multiprocessing as mp
+import multiprocessing as mp
 import mmh3
 import operator
 import os
@@ -187,7 +187,7 @@ def construct_bloomfilters(tree, bloomfiltersizes, taxonid_to_name):
 
 def get_query_kmers_queue(query, taxonid_to_readfilenames, taxonid_to_name):
 	#querykmers = []
-	querykmersQueue = mp.Queue()
+	querykmersQueue = mp.JoinableQueue()
 	try: #if the query is a taxonid
 		querytaxonid = int(query)
 		queryname = taxonid_to_name[querytaxonid]
@@ -250,7 +250,7 @@ def get_kmer_matches_queues(kmer_matches_queues, current_kmers_queue, children):
 def load_bloomfilters(childrenQueue, taxonid_to_name):
 	while True:
 		child = childrenQueue.get()
-		if child = None:
+		if child is None:
 			break
 		taxonid = int(child.name)
 		name = taxonid_to_name[taxonid]
@@ -265,7 +265,7 @@ def get_next_node_kmers(children, current_kmers_queue, threshold_proportion, num
 	next_node_kmers = [] #a list of (node, kmers) tuples
 	
 	f = 0.13
-	childrenQueue = mp.Queue()
+	childrenQueue = mp.JoinableQueue()
 	for child in children:
 		childrenQueue.put(child)
 	num_processes = 10
@@ -282,7 +282,7 @@ def get_next_node_kmers(children, current_kmers_queue, threshold_proportion, num
 	for p in processes:
 		p.join()
 	
-	kmer_matches_queues = [mp.queue() for _ in range(len(children))]
+	kmer_matches_queues = [mp.Joinablequeue() for _ in range(len(children))]
 	
 	processes = []
 	for _ in range(num_processes):
@@ -384,7 +384,7 @@ def query_tree(taxonid_to_readfilenames, taxonid_to_name, tree, query, threshold
 	num_nodes = len(list(tree.traverse()))
 	
 	#create and initialize the queues, lock, and stop event
-	workQueue = mp.Queue() #this "work" queue contains all the nodes and corresponding matching kmers for each query path down the tree
+	workQueue = mp.JoinableQueue() #this "work" queue contains all the nodes and corresponding matching kmers for each query path down the tree
 	workQueue.put((tree,querykmersQueue, 1)) #'tree' corresponds to the root node of the tree; 1 refers to the proportion of kmers that match at this node
 	
 	queriedQueue = mp.Queue() #this queue counts how many nodes have been visited during the querying process
