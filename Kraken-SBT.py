@@ -386,8 +386,8 @@ def query_tree(taxonid_to_readfilenames, tree, taxonid_to_name, query, threshold
 	#get query kmers and threshold
 	#querykmersQueue = workManager.Queue()
 	get_query_kmers(taxonid_to_readfilenames, taxonid_to_name, query)
-	#num_kmers = len(querykmers)
-	num_kmers = querykmersQueue.qsize()
+	num_kmers = len(querykmers)
+	#num_kmers = querykmersQueue.qsize()
 	print('Number of kmers in query:', num_kmers)
 	#threshold = num_kmers * threshold_proportion
 	
