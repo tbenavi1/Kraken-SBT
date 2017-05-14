@@ -384,10 +384,10 @@ if __name__=="__main__":
 		taxonids = taxonid_to_readfilenames.keys() #length is 6,740 as expected (6,741 minus the one not in NCBI)
 		taxonids = list(set(taxonids)) #4,526 taxonids are unique
 		
-		#tree = get_tree(taxonids, num_taxonids)
+		tree = get_tree(taxonids, num_taxonids)
 		
 		#tree built on i100 species
-		tree = get_tree([470, 1392, 1396, 79880, 1423, 1428, 818, 518, 9, 28450, 199, 83558, 813, 1520, 1491, 43771, 777, 106590, 43989, 562, 263, 35554, 727, 731, 135577, 1584, 1624, 1358, 29546, 174, 1764, 1765, 1781, 164757, 1773, 485, 487, 529, 1219, 303, 316, 1076, 782, 1515, 28901, 60481, 382, 1280, 1311, 1313, 1314, 32046, 46541, 274, 51229, 632], num_taxonids)
+		#tree = get_tree([470, 1392, 1396, 79880, 1423, 1428, 818, 518, 9, 28450, 199, 83558, 813, 1520, 1491, 43771, 777, 106590, 43989, 562, 263, 35554, 727, 731, 135577, 1584, 1624, 1358, 29546, 174, 1764, 1765, 1781, 164757, 1773, 485, 487, 529, 1219, 303, 316, 1076, 782, 1515, 28901, 60481, 382, 1280, 1311, 1313, 1314, 32046, 46541, 274, 51229, 632], num_taxonids)
 		
 		num_nodes = len(list(tree.traverse()))
 		print('Tree has', num_nodes, 'nodes.')
