@@ -33,18 +33,20 @@ To build the tree with the i100 genomes on a subset of the taxonids, the last ar
 python Kraken-SBT buildtree i100 10
 ```
 ## Construct Bloom Filter Database Files
-To construct the bloomfilters for the first time, run:
+To construct the bloomfilters (only necessary to do once), you can use the same arguments as for buildtree above. For example, to construct the bloomfilters on first 10 taxonids of the complete RefSeq tree, run:
 ```bash
-python Kraken-SBT bloomfilters 0
+python Kraken-SBT bloomfilters complete 0
 ```
-Running on the entire dataset will take an inordinate amount of time and memory. This is only necessary for the developer.
+Running on the entire dataset will take an inordinate amount of time and memory. This is only necessary for the developer. Note: Subsequent calls to bloomfilters will recognize if the bloom filter already exists, and thus will not waste time recreating the bloom filter. To test the construction of the bloom filters, you can run on increasingly larger trees.
 
 ## Querying the tree
-To query the full tree for a given taxonid (e.g. 385025), and return the nodes for which the proportion of matching query kmers exceeds a given threshold, run:
+To query the complete tree on all taxonids for a given number of kmers (num_kmers) of a given taxonid (e.g. 385025), and return the nodes for which the proportion of matching query kmers exceeds a given threshold (theta), run:
 ```bash
-python Kraken-SBT query 0 385025 threshold
+python Kraken-SBT query complete 0 385025 num_kmers theta num_workers
 ```
-To query the full tree for a given jellyfish dumps file containing a set of kmers, and return the nodes for which the proportion of matching query kmers exceeds a given threshold, run:
+The last argument (num_workers) is the number of processing threads used for the computation.
+To query the complete tree on all taxonids for a given number of kmers of a given jellyfish dumps file containing a set of kmers, and return the nodes for which the proportion of matching query kmers exceeds a given threshold (theta), run:
 ```bash
-python Kraken_SBT query 0 queryfilename threshold
+python Kraken_SBT query complete 0 queryfilename num_kmers theta num_workers
 ```
+The last argument is the number of processing threads used for the computation, as before.
