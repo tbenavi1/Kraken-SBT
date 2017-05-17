@@ -16,19 +16,22 @@ will first download the 6,741 complete RefSeq bacterial genomes into a directory
 Note: This will take a very long time and it is not necessary for the typical end user. This is only necessary for the developer.
 
 ## Running for the first time
-Kraken-SBT can run on the tree built with the complete RefSeq genomes (~4500 taxonids), or on the tree built with the i100 metagenomics genomes (56 taxonids). Additionally, Kraken-SBT can run on the entire trees (all taxonids), or on a subset of the trees (a given number of taxonids). To build the tree with the complete RefSeq genomes on all taxonids, run:
+Kraken-SBT can run on the tree built with the complete RefSeq genomes (~4500 taxonids), or on the tree built with the i100 metagenomics genomes (56 taxonids). Additionally, Kraken-SBT can run on the entire tree (all taxonids), or on a subset of the tree (a given number of taxonids). To build the tree with the complete RefSeq genomes on all taxonids, run:
 ```bash
 python Kraken-SBT buildtree complete 0
 ```
-To build the tree with the complete RefSeq genomes on a subset of the taxonids, the first argument of buildtree should be the desired number of taxonids. For instance:
+To build the tree with the complete RefSeq genomes on a subset of the taxonids, the last argument should be the desired number of taxonids. For instance:
 ```bash
 python Kraken-SBT buildtree complete 10
 ```
-To build the tree on the i100 genomes with all taxonids, run:
-```
+To build the tree with the i100 genomes on all taxonids, run:
+```bash
 python Kraken-SBT buildtree i100 0
 ```
-To build the tree with the i100 genomes on a subset of the taxonids,
+To build the tree with the i100 genomes on a subset of the taxonids, the last argument should be the desired number of taxonids. For instance:
+```bash
+python Kraken-SBT buildtree i100 10
+```
 ## Construct Bloom Filter Database Files
 To construct the bloomfilters for the first time, run:
 ```bash
