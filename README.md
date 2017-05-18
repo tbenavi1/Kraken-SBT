@@ -39,15 +39,17 @@ To construct the bloomfilters (only necessary to do once), you can use the same 
 ```bash
 python Kraken-SBT editednames i100 10
 ```
-This command takes the same arguments as build tree above and creates a file called editednames which is a list of edited names for all the nodes in the tree. Then you must run get_bloomfiltersizes.sh file to produce bloomfiltersizes. This file contains the number of unique kmers that will be present in each bloom filter. This number is necessary to ensure the given false positive rate (in this case 13%). If you receive the error "terminate called after throwing an instance of 'std::bad_alloc'" then reduce the number for the -m argument. The file bloomfiltersizes has already been provided in the submission.
+This command takes the same arguments as build tree above and creates a file called editednames which is a list of edited names for all the nodes in the tree. Then you must run:
+```bash
+get_bloomfiltersizes.sh
+```
+to produce bloomfiltersizes. This file contains the number of unique kmers that will be present in each bloom filter. This number is necessary to ensure the given false positive rate (in this case 13%). If you receive the error "terminate called after throwing an instance of 'std::bad_alloc'" then reduce the number for the -m argument. The file bloomfiltersizes has already been provided in the submission.
 
-
-To construct the bloomfilters on first 10 taxonids of the complete RefSeq tree, run:
+At this point, to construct the bloomfilters on first 10 taxonids of the complete RefSeq tree, run:
 ```bash
 python Kraken-SBT bloomfilters complete 0
 ```
 Running on the entire dataset will take an inordinate amount of time and memory. This is only necessary for the developer. Note: Subsequent calls to bloomfilters will recognize if the bloom filter already exists, and thus will not waste time recreating the bloom filter. To test the construction of the bloom filters, you can run on increasingly larger trees.
-
 
 ## Querying the tree
 To query the complete tree on all taxonids for a given number of kmers (num_kmers) of a given taxonid (e.g. 385025), and return the nodes for which the proportion of matching query kmers exceeds a given threshold (theta), run:
