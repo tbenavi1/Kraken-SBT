@@ -63,4 +63,4 @@ python Kraken_SBT query complete 0 queryfilename num_kmers theta num_workers
 ```
 The last argument is the number of processing threads used for the computation, as before.
 
-For this project, I run my tool using the i100 dataset as a query. Thus, the user must download the dataset from http://www.bork.embl.de/~mende/simulated_data/. 
+For this project, I run my tool using the i100 dataset as a query. Thus, the user must download the dataset from http://www.bork.embl.de/~mende/simulated_data/. I then run jellyfish count and jellyfish dump as before (see setup.sh) to get the file containing all the unique kmers for the query. Wherever you save this kmer dumps file, you can give as the queryfilename argument to the query function.
