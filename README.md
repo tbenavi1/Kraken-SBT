@@ -6,6 +6,7 @@
 3. bitarray from https://pypi.python.org/pypi/bitarray/
 4. mmh3 from https://pypi.python.org/pypi/mmh3/2.3.1
 5. jellyfish 2 from http://www.genome.umd.edu/jellyfish.html
+6. KMC 3 from http://sun.aei.polsl.pl/REFRESH/index.php?page=projects&project=kmc&subpage=download
 
 ## Setting up your environment
 Running:
