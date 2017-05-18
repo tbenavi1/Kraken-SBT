@@ -338,12 +338,20 @@ if __name__=="__main__":
 		
 		taxonid_to_name = get_taxonid_to_name(tree)
 	
+	if command == "descendantfilenames":
+		f = open('editednames'):
+		for node in tree.traverse():
+			taxonid = int(node.name)
+			name = taxonid_to_name[taxonid]
+			edited_name = name.replace(' ', '_').replace('/', '_')
+			f.write(edited_name + '\n')
+		f.close()
+		write_descendantfiles(tree, taxonid_to_name)
+	
 	if command == "bloomfilters":
 		#construct the bloomfilters (only necessary for the first time building the database)
 		#actually, the end user never needs to perform this step, since they will download the bloom filters directly
 		bloomfiltersizes = read_bloomfiltersizes('bloomfiltersizes')
-		write_descendantfiles(tree, taxonid_to_name)
-		bloomfiltersizes = read_bloomfiltersizes('bloomfiltersizes2')
 		construct_bloomfilters(tree, taxonid_to_name, bloomfiltersizes)
 	
 	if command == "query":
