@@ -62,3 +62,5 @@ To query the complete tree on all taxonids for a given number of kmers of a give
 python Kraken_SBT query complete 0 queryfilename num_kmers theta num_workers
 ```
 The last argument is the number of processing threads used for the computation, as before.
+
+For this project, I run my tool using the i100 dataset as a query. Thus, the user must download the dataset from http://www.bork.embl.de/~mende/simulated_data/. 
