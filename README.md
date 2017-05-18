@@ -35,11 +35,11 @@ To build the tree with the i100 genomes on a subset of the taxonids, the last ar
 python Kraken-SBT buildtree i100 10
 ```
 ## Construct Bloom Filter Database Files
-To construct the bloomfilters (only necessary to do once), you can use the same arguments as for buildtree above. As a preliminary step, you must first run the editednames command:
+To construct the bloomfilters (only necessary to do once), you can use the same arguments as for buildtree above. As a preliminary step, you must first run the descendantfilenames command:
 ```bash
-python Kraken-SBT editednames i100 10
+python Kraken-SBT descendantfilenames i100 10
 ```
-This command takes the same arguments as build tree above and creates a file called editednames which is a list of edited names for all the nodes in the tree. Then you must run:
+This command takes the same arguments as build tree above and creates a file for each node of the tree which lists the filenames of all the read files corresponding to the descendant subtree at that node. Then you must run:
 ```bash
 get_bloomfiltersizes.sh
 ```
