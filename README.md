@@ -47,7 +47,7 @@ to produce bloomfiltersizes. This file contains the number of unique kmers that 
 
 At this point, to construct the bloomfilters on first 10 taxonids of the complete RefSeq tree, run:
 ```bash
-python Kraken-SBT bloomfilters complete 0
+python Kraken-SBT bloomfilters complete 10
 ```
 Running on the entire dataset will take an inordinate amount of time and memory. This is only necessary for the developer. Note: Subsequent calls to bloomfilters will recognize if the bloom filter already exists, and thus will not waste time recreating the bloom filter. To test the construction of the bloom filters, you can run on increasingly larger trees.
 
