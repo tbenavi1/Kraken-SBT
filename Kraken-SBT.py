@@ -43,8 +43,7 @@ def get_taxonid_to_readfilenames(name_ftpdirpaths_filename): #searches through a
 		splits = line.strip().split(' ') #split on each of the spaces
 		name = ' '.join(splits[:-1]) #concatenate everything before the last space
 		ftpdirpath = splits[-1] #everything after the last space
-		#readfilename = './Bacteria_Genomes/' + ftpdirpath.split('/')[-1] + '_genomic.fna.gz'
-		readfilename = './Bacteria_Genomes/' + ftpdirpath.split('/')[-1] + '_genomic.fna'
+		readfilename = './Bacteria_Genomes/' + ftpdirpath.split('/')[-1] + '_genomic.fna.gz'
 		name_to_taxonid = ncbi.get_name_translator([name]) #a dictionary with name as key and [taxonid] as value
 		listtaxonid = [taxonid for [taxonid] in name_to_taxonid.values()] #if the name was found in the ncbi database, listtaxonid is a list containing the taxonid; otherwise, an empty list.
 		if listtaxonid:
@@ -125,9 +124,8 @@ def construct_bloomfilter(taxonid_to_name, bloomfiltersizes, num_nodes, nodesQue
 		name = taxonid_to_name[taxonid]
 		print('Constructing bloom filter for node', i+1, 'out of', str(num_nodes) + ':', name)
 		edited_name = name.replace(' ', '_').replace('/', '_')
-		#descendantfilenames_filename = edited_name + '.descendantfilenames'
-		descendantfilenames_filename = edited_name + '.readfiles'
-		bv_filename = edited_name + '.bv'
+		descendantfilenames_filename = edited_name + '.descendantfilenames'
+		bv_filename = './bloomfilters/' + edited_name + '.bv'
 		if os.path.exists(bv_filename):
 			print(bv_filename, 'already exists.')
 			nodesQueue.task_done()
@@ -138,8 +136,6 @@ def construct_bloomfilter(taxonid_to_name, bloomfiltersizes, num_nodes, nodesQue
 			with open(descendantfilenames_filename) as f:
 				num_files = sum(1 for _ in f)
 			for j, descendant_filename in enumerate(open(descendantfilenames_filename)): #this for loop and the for loop below add all the kmers from all the descendant node files to the bloom filter
-				#May need to parallelize the two for loops!!!!!!!!
-				#descendant_filename = descendant_filename.strip()
 				descendant_filename = descendant_filename.strip() + '.dumps'
 				print('Reading file', j+1, 'out of', str(num_files) + ':', name)
 				for line in open(descendant_filename):
@@ -160,7 +156,7 @@ def construct_bloomfilters(tree, taxonid_to_name, bloomfiltersizes):
 	
 	num_processes = 100
 	processes = []
-:	for _ in range(num_processes):
+	for i in range(num_processes):
 		process = mp.Process(target = construct_bloomfilter, args = (taxonid_to_name, bloomfiltersizes, num_nodes, nodesQueue))
 		process.start()
 		processes.append(process)
@@ -175,9 +171,8 @@ def construct_bloomfilters(tree, taxonid_to_name, bloomfiltersizes):
 	for p in processes:
 		p.join()
 
-def get_query_kmers(taxonid_to_readfilenames, taxonid_to_name, query, querykmers):
-	#querykmers = []
-	
+def get_query_kmers(taxonid_to_readfilenames, taxonid_to_name, query, max_num_kmers, num_workers):
+	querykmers = []
 	try: #if the query is a taxonid
 		querytaxonid = int(query)
 		queryname = taxonid_to_name[querytaxonid]
@@ -185,20 +180,22 @@ def get_query_kmers(taxonid_to_readfilenames, taxonid_to_name, query, querykmers
 		queryreadfilenames = taxonid_to_readfilenames[querytaxonid]
 		for queryreadfilename in queryreadfilenames:
 			querydumpsfilename = queryreadfilename + '.dumps'
-			for line in open(querydumpsfilename):
-				kmer = line.strip().split(' ')[0]
-				#querykmers.append(kmer)
-				querykmers.put(kmer)
+			with open(querydumpsfilename) as f:
+				for line in f:
+					if i == max_num_kmers and i != 0: #only get at most max_num_kmers kmers of the query; if max_num_kmers == 0, get all kmers of the query
+						break
+					kmer = line.strip().split(' ')[0]
+					querykmers.append(kmer)
 	except: #if the query is a filename
 		queryfilename = query
 		print('Query filename is', queryfilename)
-		for i, line in enumerate(open(queryfilename)):
-			if i == 100000: #only count a given number of kmers, for testing purposes
-				break
-			kmer = line.strip().split(' ')[0]
-			#querykmers.append(kmer)
-			querykmers.put(kmer)
-	#return querykmers
+		with open(queryfilename) as f:
+			for i, line in enumerate(f):
+				if i == max_num_kmers and i != 0: #only get at most max_num_kmers kmers of the query; if max_num_kmers == 0, get all kmers of the query
+					break
+				kmer = line.strip().split(' ')[0]
+				querykmers.append(kmer)
+	return querykmers
 
 def bf_from_bvfilename(bv_filename):
 	f = open(bv_filename, 'rb') #open file with bitvector
@@ -208,167 +205,101 @@ def bf_from_bvfilename(bv_filename):
 	bf = BloomFilter(bitvector.length(), 3, bitvector) #create bloom filter with num_hashes = 3
 	return bf
 
-def get_kmer_matches(children, current_kmers_queue, kmer_matches):
-	while True:
-		current_kmer = current_kmers_queue.get()
-		if current_kmer is None:
-			break
-		for i, child in enumerate(children):
-			if child.bf.contains(current_kmer):
-				kmer_matches[i].put(current_kmer)
-		current_kmers_queue.task_done()
-
-def load_bloomfilters(taxonid_to_name, childrenQueue):
-	while True:
-		child = childrenQueue.get()
-		if child is None:
-			break
-		taxonid = int(child.name)
-		name = taxonid_to_name[taxonid]
-		edited_name = name.replace(' ', '_').replace('/', '_')
-		bv_filename = edited_name + '.bv'
-		print('Loading', name)
-		child.bf = bf_from_bvfilename(bv_filename)
-		print(name, 'loaded')
-		childrenQueue.task_done()
-	childrenQueue.put(child)
-
-def get_next_node_kmers(taxonid_to_name, threshold_proportion, num_kmers, current_kmers, p, children):
+def get_next_node_kmers(taxonid_to_name, threshold_proportion, num_workers, num_kmers, current_kmers, p, children):
 	next_node_kmers = [] #a list of (node, kmers) tuples
 	
-	childrenManager = mp.Manager()
-	
-	f = 0.13 #the false positive rate for the bloom filters
-	
+	#Load the bloom filters
 	for i, child in enumerate(children):
 		taxonid = int(child.name)
 		name = taxonid_to_name[taxonid]
 		edited_name = name.replace(' ', '_').replace('/', '_')
-		bv_filename = edited_name + '.bv'
+		bv_filename = './bloomfilters/' + edited_name + '.bv'
 		print('Loading', name)
 		children[i].bf = bf_from_bvfilename(bv_filename)
 		print(name, 'loaded')
 	
-	current_kmers_queue = childrenManager.Queue()
-	
-	kmer_matches = [childrenManager.Queue() for _ in range(len(children))]
-	
-	num_processes = 100
-	processes = []
-	for _ in range(num_processes):
-		process = mp.Process(target = get_kmer_matches, args = (children, current_kmers, kmer_matches))
-		#process = mp.Process(target = get_kmer_matches, args = (children, current_kmers_queue, kmer_matches))
-		process.start()
-		processes.append(process)
-	
-	#for current_kmer in current_kmers:
-	#	current_kmers_queue.put(current_kmer)
-	
-	#current_kmers_queue.join()
-	current_kmers.join()
-	
-	for i in range(num_processes):
-	#	current_kmers_queue.put(None)
-		current_kmers.put(None)
-	for process in processes:
-		process.join()
-	
-	#for i in range(len(children)):
-	#	kmer_matches[i].put(None)
-	#kmer_matches = [list(iter(item.get, None)) for item in kmer_matches]
-	
+	kmer_matches = [[] for _ in range(len(children))]
+	f = 0.13 #the false positive rate of the bloom filters	
+
+	#add matching kmers if exceed threshold_proportion
 	for i, child in enumerate(children):
-		delattr(child, 'bf')
-		#q = len(kmer_matches[i])/num_kmers
-		q = kmer_matches[i].qsize()/num_kmers
-		#print('q',q)
-		adjusted_proportion = (q - (p*f))/(1-f)
-		#print('adjusted', adjusted_proportion)
+		for current_kmer in current_kmers:
+			if child.bf.contains(current_kmer):
+				kmer_matches[i].append(current_kmer)
+		q = len(kmer_matches[i])/num_kmers
+		adjusted_proportion = (q-p*f)/(1-f)
 		if adjusted_proportion >= threshold_proportion:
 			next_node_kmers.append((child, kmer_matches[i], adjusted_proportion))
 	
+	#remove bloom filters from memory
+	for i, child in enumerate(children):
+		delattr(child, 'bf')
+	
 	return next_node_kmers
 
-def analyze_node(taxonid_to_name, threshold_proportion, name_to_proportion, num_kmers, workQueue, queriedQueue): #each thread targets this function to analyze its current node
+def analyze_node(taxonid_to_name, threshold_proportion, num_workers, name_to_proportion, num_kmers, workQueue, queriedQueue): #each process targets this function to analyze its current node
 	while True:
 		current_node, current_kmers, adjusted_proportion = workQueue.get()
 		if current_node is None:
 			break
-		#p = len(current_kmers)/num_kmers
-		p = current_kmers.qsize()/num_kmers
+		p = len(current_kmers)/num_kmers
 		current_taxonid = int(current_node.name)
 		current_name = taxonid_to_name[current_taxonid]
 		print('Current node:', current_name)
 		if current_node.is_leaf():
-			#proportion = len(current_kmers)/num_kmers
-			#name_to_proportion[current_name] = proportion
-			#print('Proportion of query kmers matching', current_name + ':', proportion)
 			name_to_proportion[current_name] = adjusted_proportion
 			print('Proportion of query kmers matching', current_name + ':', adjusted_proportion)
 			workQueue.task_done()
 		else:
 			children = current_node.children
-			next_node_kmers = get_next_node_kmers(taxonid_to_name, threshold_proportion, num_kmers, current_kmers, p, children)
+			next_node_kmers = get_next_node_kmers(taxonid_to_name, threshold_proportion, num_workers, num_kmers, current_kmers, p, children)
 			num_queried = queriedQueue.get()
 			num_queried += len(children)
 			queriedQueue.put(num_queried)
-			if next_node_kmers == []:
-				#proportion = len(current_kmers)/num_kmers
-				#name_to_proportion[current_name] = proportion
-				#print('Proportion of query kmers matching', current_name + ':', proportion)
+			if next_node_kmers == []: # if all of the children are a dead end (i.e. proportion matching doesn't exceed threshold)
 				name_to_proportion[current_name] = adjusted_proportion
 				print('Proportion of query kmers matching', current_name + ':', adjusted_proportion)
 				workQueue.task_done()
-			else:
-				for (child, kmer_matches_queue, adjusted_proportion) in next_node_kmers:
-					workQueue.put((child, kmer_matches_queue, adjusted_proportion))
+			else: #if at least one child is not a dead end
+				for (child, kmer_matches, adjusted_proportion) in next_node_kmers: #add matching children to work queue
+					workQueue.put((child, kmer_matches, adjusted_proportion))
 					print('Added to queue.')
 				workQueue.task_done()
 
 #query the tree
-def query_tree(taxonid_to_readfilenames, tree, taxonid_to_name, query, threshold_proportion):
+def query_tree(taxonid_to_readfilenames, tree, taxonid_to_name, query, max_num_kmers, threshold_proportion, num_workers):
 	
-	#name_to_proportion = {} #a dictionary with name as key and the proportion of kmers matching the name as value
+	workManager = mp.Manager() #a multiprocessing manager to manage all the shared data between workers
 	
-	workManager = mp.Manager()
+	name_to_proportion = workManager.dict() # a multiprocessing dictionary with name as key and the proportion of kmers matching the name as the value; since it is multiprocessing, it can be accessed and modified by all workers
 	
-	
-	name_to_proportion = workManager.dict()
-	
-	#get query kmers and threshold
-	querykmers = workManager.Queue()
-	get_query_kmers(taxonid_to_readfilenames, taxonid_to_name, querykmers)
-	#querykmers = get_query_kmers(taxonid_to_readfilenames, taxonid_to_name, query)
-	#num_kmers = len(querykmers)
-	num_kmers = querykmers.qsize()
+	#get query kmers
+	querykmers = get_query_kmers(taxonid_to_readfilenames, taxonid_to_name, query, max_num_kmers, num_workers)
+	num_kmers = len(querykmers)
 	print('Number of kmers in query:', num_kmers)
-	#threshold = num_kmers * threshold_proportion
 	
 	#get the total number of nodes in the tree
 	num_nodes = len(list(tree.traverse()))
 	
-	#create and initialize the queues, lock, and stop event
-	#workQueue = mp.JoinableQueue() #this "work" queue contains all the nodes and corresponding matching kmers for each query path down the tree
-	workQueue = workManager.Queue()
-	workQueue.put((tree,querykmers, 1)) #'tree' corresponds to the root node of the tree; 1 refers to the proportion of kmers that match at this node
+	#create and initialize the work queue
+	workQueue = workManager.Queue() #this multiprocessing 'work' queue contains all the nodes and corresponding matching kmers for each query path down the tree
+	workQueue.put((tree,querykmers, 1)) #'tree' corresponds to the root node of the tree; 1 refers to the (adjusted) proportion of kmers that match at this node
 	
-	#queriedQueue = mp.Queue() #this queue counts how many nodes have been visited during the querying process
-	queriedQueue = workManager.Queue()
+	queriedQueue = workManager.Queue() #this multiprocessing queue contains an integer corresponding to the number of nodes that have been visited during the querying process (summed along all paths)
 	queriedQueue.put(0)
 	
-	#create new threads
-	num_processes = 100
+	#create new processes
 	processes = []
-	for _ in range(num_processes):
-		process = mp.Process(target = analyze_node, args = (taxonid_to_name, threshold_proportion, name_to_proportion, num_kmers, workQueue, queriedQueue))
+	for _ in range(num_workers): #start processes to target 'analyze_node' function
+		process = mp.Process(target = analyze_node, args = (taxonid_to_name, threshold_proportion, num_workers, name_to_proportion, num_kmers, workQueue, queriedQueue))
 		process.start()
 		processes.append(process)
 	
-	#wait for the queue to be complete, then trigger event to stop threads
+	#wait for the work queue to be complete
 	workQueue.join()
 	
-	#wait for all threads to complete
-	for i in range(num_processes):
+	#Add sentinel (stop) values to work queue to signal processes to stop, then wait for all processes to complete
+	for i in range(num_workers):
 		workQueue.put((None, None, None))
 	for p in processes:
 		p.join()
@@ -386,17 +317,21 @@ if __name__=="__main__":
 		print('Possible commands are \'buildtree\', \'bloomfilters\', and \'query\'.')
 	
 	if command:
-		num_taxonids = int(sys.argv[2])
+		tree_to_build = sys.argv[2]
+		num_taxonids = int(sys.argv[3])
 		taxonid_to_readfilenames = get_taxonid_to_readfilenames('name_ftpdirpaths')
 		
 		#get the unique taxonids, in order to create the phylogeny tree
 		taxonids = taxonid_to_readfilenames.keys() #length is 6,740 as expected (6,741 minus the one not in NCBI)
 		taxonids = list(set(taxonids)) #4,526 taxonids are unique
 		
-		tree = get_tree(taxonids, num_taxonids)
+		if tree_to_build == 'complete':
+			tree = get_tree(taxonids, num_taxonids)
 		
-		#tree built on i100 species
-		#tree = get_tree([470, 1392, 1396, 79880, 1423, 1428, 818, 518, 9, 28450, 199, 83558, 813, 1520, 1491, 43771, 777, 106590, 43989, 562, 263, 35554, 727, 731, 135577, 1584, 1624, 1358, 29546, 174, 1764, 1765, 1781, 164757, 1773, 485, 487, 529, 1219, 303, 316, 1076, 782, 1515, 28901, 60481, 382, 1280, 1311, 1313, 1314, 32046, 46541, 274, 51229, 632], num_taxonids)
+		if tree_to_build == 'i100':
+			#tree built on i100 species
+			#Note: Of the 85 species present in the i100 metagenomics sample, 3 are not bacteria, and 26 are not labeled as "Complete Genome" in RefSeq. Thus, this tree consists of the 56 complete bacteria species.
+			tree = get_tree([470, 1392, 1396, 79880, 1423, 1428, 818, 518, 9, 28450, 199, 83558, 813, 1520, 1491, 43771, 777, 106590, 43989, 562, 263, 35554, 727, 731, 135577, 1584, 1624, 1358, 29546, 174, 1764, 1765, 1781, 164757, 1773, 485, 487, 529, 1219, 303, 316, 1076, 782, 1515, 28901, 60481, 382, 1280, 1311, 1313, 1314, 32046, 46541, 274, 51229, 632], num_taxonids)
 		
 		num_nodes = len(list(tree.traverse()))
 		print('Tree has', num_nodes, 'nodes.')
@@ -406,13 +341,15 @@ if __name__=="__main__":
 	if command == "bloomfilters":
 		#construct the bloomfilters (only necessary for the first time building the database)
 		#actually, the end user never needs to perform this step, since they will download the bloom filters directly
-		#bloomfiltersizes = read_bloomfiltersizes('bloomfiltersizes')
+		bloomfiltersizes = read_bloomfiltersizes('bloomfiltersizes')
 		write_descendantfiles(tree, taxonid_to_name)
 		bloomfiltersizes = read_bloomfiltersizes('bloomfiltersizes2')
 		construct_bloomfilters(tree, taxonid_to_name, bloomfiltersizes)
 	
 	if command == "query":
-		query = sys.argv[3]
-		threshold_proportion = float(sys.argv[4])
-		matches = query_tree(taxonid_to_readfilenames, tree, taxonid_to_name, query, threshold_proportion)
+		query = sys.argv[4]
+		max_num_kmers = int(sys.argv[5])
+		threshold_proportion = float(sys.argv[6])
+		num_workers = int(sys.argv[7])
+		matches = query_tree(taxonid_to_readfilenames, tree, taxonid_to_name, query, max_num_kmers, threshold_proportion, num_workers)
 		print(matches)
